@@ -32,7 +32,7 @@ func (fs *LocalFileOperator) SaveFile(filename string, contentReader io.Reader) 
 	// filePathOD filepath on disk.
 	filePathOD := filepath.Join(fs.basePath, filename)
 	// Check if the file already exists.
-	if _, err := os.Stat(filePathOD); !os.IsNotExist(err) {
+	if _, err := os.Stat(filePathOD); err == nil {
 		// Return error if the file already exists.
 		return fmt.Errorf("File %s already exist", filePathOD)
 	}
