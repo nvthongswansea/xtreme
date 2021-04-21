@@ -3,10 +3,10 @@ package usecase
 import (
 	"io"
 
-	fileUtils "github.com/nvthongswansea/xtreme/internal/file-utils"
 	"github.com/nvthongswansea/xtreme/internal/fman"
 	"github.com/nvthongswansea/xtreme/internal/models"
-	uuidUtils "github.com/nvthongswansea/xtreme/internal/uuid-utils"
+	fileUtils "github.com/nvthongswansea/xtreme/pkg/file-utils"
+	uuidUtils "github.com/nvthongswansea/xtreme/pkg/uuid-utils"
 )
 
 type FManLocalUsecase struct {

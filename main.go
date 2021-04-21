@@ -7,11 +7,11 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	fileUtils "github.com/nvthongswansea/xtreme/internal/file-utils"
 	restful "github.com/nvthongswansea/xtreme/internal/fman/delivery/restful"
 	_fmanRepo "github.com/nvthongswansea/xtreme/internal/fman/repo"
 	_fmanUC "github.com/nvthongswansea/xtreme/internal/fman/usecase"
-	uuidUtils "github.com/nvthongswansea/xtreme/internal/uuid-utils"
+	fileUtils "github.com/nvthongswansea/xtreme/pkg/file-utils"
+	uuidUtils "github.com/nvthongswansea/xtreme/pkg/uuid-utils"
 )
 
 var basePath string
