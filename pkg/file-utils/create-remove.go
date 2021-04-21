@@ -47,7 +47,9 @@ func (fs *LocalFileOperator) SaveFile(filename string, contentReader io.Reader) 
 	return err
 }
 
-// RemoveFile removes a fiel from the local disk.
+// RemoveFile removes a file from the local disk.
 func (fs *LocalFileOperator) RemoveFile(filename string) error {
-	return nil
+	// filePathOD filepath on disk.
+	filePathOD := filepath.Join(fs.basePath, filename)
+	return os.Remove(filePathOD)
 }
