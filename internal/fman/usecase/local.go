@@ -9,26 +9,27 @@ import (
 	uuidUtils "github.com/nvthongswansea/xtreme/pkg/uuid-utils"
 )
 
+// FManLocalUsecase provides usecase(logic) for file manager on local storage.
 type FManLocalUsecase struct {
-	dbRepo    fman.FManDBRepo
-	uuidGen   uuidUtils.UUIDGenerator
-	fileSaver fileUtils.FileSaverRemover
+	dbRepo  fman.FManDBRepo
+	uuidGen uuidUtils.UUIDGenerator
+	fileOps fileUtils.FileSaveReadRemover
 }
 
-// NewFManLocalUsecase create a new FManLocalUsecase
-func NewFManLocalUsecase(dbRepo fman.FManDBRepo, uuidGen uuidUtils.UUIDGenerator, fileSaver fileUtils.FileSaverRemover) *FManLocalUsecase {
+// NewFManLocalUsecase create a new FManLocalUsecase.
+func NewFManLocalUsecase(dbRepo fman.FManDBRepo, uuidGen uuidUtils.UUIDGenerator, fileOps fileUtils.FileSaveReadRemover) *FManLocalUsecase {
 	return &FManLocalUsecase{
 		dbRepo,
 		uuidGen,
-		fileSaver,
+		fileOps,
 	}
 }
 
 func (u *FManLocalUsecase) UploadFile(newFile models.File, contentReader io.Reader) error {
-	// generate a new UUID.
+	// Generate a new UUID.
 	newFile.UUID = u.uuidGen.NewUUID()
 	// Save file to the disk.
-	err := u.fileSaver.SaveFile(newFile.UUID, contentReader)
+	err := u.fileOps.SaveFile(newFile.UUID, contentReader)
 	if err != nil {
 		return err
 	}
@@ -37,8 +38,23 @@ func (u *FManLocalUsecase) UploadFile(newFile models.File, contentReader io.Read
 	return err
 }
 
-func (u *FManLocalUsecase) CopyFile() {
-	panic("not implemented")
+func (u *FManLocalUsecase) CopyFile(dstFile models.File, srcFile models.File) error {
+	// Generate a new UUID for the destination file.
+	dstFile.UUID = u.uuidGen.NewUUID()
+	// Get source file pointer to read its content.
+	srcFReadCloser, err := u.fileOps.ReadFile(srcFile.Filename)
+	if err != nil {
+		return err
+	}
+	defer srcFReadCloser.Close()
+	// Save the dst file to the disk.
+	err = u.fileOps.SaveFile(dstFile.UUID, srcFReadCloser)
+	if err != nil {
+		return err
+	}
+	// Insert a new file record to the DB.
+	_, err = u.dbRepo.InsertFileRecord(dstFile)
+	return err
 }
 
 func (u *FManLocalUsecase) MoveFile() {

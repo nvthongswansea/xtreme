@@ -11,8 +11,8 @@ type FmanUsecase interface {
 	// Update a file.
 	UploadFile(newFile models.File, contentReader io.Reader) error
 
-	// Copy a file.
-	CopyFile()
+	// Copy a file to a new location.
+	CopyFile(dstFile models.File, srcFile models.File) error
 
 	// Move a file.
 	MoveFile()

@@ -7,10 +7,15 @@ import (
 	"path/filepath"
 )
 
-// FileSaverRemover provides an interface to save/remove a file to/from the source.
-type FileSaverRemover interface {
+// FileSaveReadRemover provides an interface to save/read/remove a file to/from/from a source.
+type FileSaveReadRemover interface {
 	// Save file to a source.
 	SaveFile(filename string, contentReader io.Reader) error
+
+	// ReadFile returns an instance of io.ReadCloser. Data can be read from the instance via
+	// Read() function. NOTE: Remember to Close() after reading the content.
+	ReadFile(filename string) (io.ReadCloser, error)
+
 	// Remove a file from a source.
 	RemoveFile(filename string) error
 }
@@ -45,6 +50,14 @@ func (fs *LocalFileOperator) SaveFile(filename string, contentReader io.Reader) 
 	// Copy content to the dst file.
 	_, err = io.Copy(dstF, contentReader)
 	return err
+}
+
+// ReadFile returns an os.File pointer with a given filename, which can be only used for reading the file content from the
+// local storage.
+func (fs *LocalFileOperator) ReadFile(filename string) (io.ReadCloser, error) {
+	// filePathOD filepath on disk.
+	filePathOD := filepath.Join(fs.basePath, filename)
+	return os.Open(filePathOD)
 }
 
 // RemoveFile removes a file from the local disk.
