@@ -6,13 +6,13 @@ import "github.com/nvthongswansea/xtreme/internal/models"
 type FManDBRepo interface {
 	// InsertFileRecord inserts a file record to db. Returns the newly inserted row, if success;
 	// otherwise return an error.
-	InsertFileRecord(newFile models.File) (models.File, error)
+	InsertFileRecord(newFile models.File) (bool, error)
 
 	// ReadFileRecord reads a file record from the db with a given UUID.
 	ReadFileRecord(UUID string) (models.File, error)
 
 	// UpdateFileRecord updates a file record in the db.
-	UpdateFileRecord(file models.File) error
+	UpdateFileRecord(file models.File) (bool, error)
 
 	// SoftRemoveFileRecord flags a file record as deleted file.
 	// e.g. set `is_deleted` field to true.
