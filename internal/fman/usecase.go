@@ -14,6 +14,9 @@ type FmanUsecase interface {
 	// Copy a file to a new location.
 	CopyFile(dstFile models.File, srcFile models.File) error
 
+	// Create a new directory/folder.
+	CreateNewDirectory(newDir models.File) error
+
 	// Move a file.
 	MoveFile()
 

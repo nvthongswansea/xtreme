@@ -82,6 +82,26 @@ func (u *FManLocalUsecase) CopyFile(dstFile models.File, srcFile models.File) er
 	return err
 }
 
+func (u *FManLocalUsecase) CreateNewDirectory(newDir models.File) error {
+	// Check if the directory already exists in a desired location in the db.
+	isExist, err := u.dbRepo.IsFileRecordExist(newDir)
+	if err != nil {
+		return err
+	}
+	if isExist {
+		return fmt.Errorf("%s already exist in the desired location", newDir.Filename)
+	}
+	// Generate a new UUID.
+	newDir.UUID = u.uuidGen.NewUUID()
+	// Insert new file record to the DB.
+	if _, err := u.dbRepo.InsertFileRecord(newDir); err != nil {
+		// If error reprents while inserting a new record,
+		// remove the file from the storage.
+		return u.fileOps.RemoveFile(newDir.UUID)
+	}
+	return err
+}
+
 func (u *FManLocalUsecase) MoveFile() {
 	panic("not implemented")
 }
