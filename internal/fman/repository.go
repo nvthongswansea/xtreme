@@ -20,4 +20,7 @@ type FManDBRepo interface {
 
 	// HardRemoveFileRecord removes a file record completely from the db.
 	HardRemoveFileRecord(UUID string) error
+
+	// IsFileRecordExist checks if a specific file/dir exist in the db.
+	IsFileRecordExist(file models.File) (bool, error)
 }
