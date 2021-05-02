@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/nvthongswansea/xtreme/internal/fman"
@@ -26,10 +27,15 @@ func NewFManLocalUsecase(dbRepo fman.FManDBRepo, uuidGen uuidUtils.UUIDGenerator
 }
 
 func (u *FManLocalUsecase) UploadFile(newFile models.File, contentReader io.Reader) error {
+	// Check if the file already exists in a desired location in the db.
+	isExist, err := u.dbRepo.IsFileRecordExist(newFile)
+	if isExist {
+		return fmt.Errorf("%s already exist in the desired location", newFile.Filename)
+	}
 	// Generate a new UUID.
 	newFile.UUID = u.uuidGen.NewUUID()
 	// Save file to the disk.
-	err := u.fileOps.SaveFile(newFile.UUID, contentReader)
+	err = u.fileOps.SaveFile(newFile.UUID, contentReader)
 	if err != nil {
 		return err
 	}
