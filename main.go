@@ -29,8 +29,8 @@ func init() {
 func main() {
 	sqliteRepo := _fmanRepo.NewFManSQLiteRepo()
 	uuidGenerator := &uuidUtils.GoogleUUIDGenerator{}
-	fileSaver := fileUtils.CreateNewLocalFileOperator(basePath)
-	fmanUC := _fmanUC.NewFManLocalUsecase(sqliteRepo, uuidGenerator, fileSaver)
+	localFileOps := fileUtils.CreateNewLocalFileOperator(basePath)
+	fmanUC := _fmanUC.NewFManLocalUsecase(sqliteRepo, sqliteRepo, sqliteRepo, uuidGenerator, localFileOps)
 	//Start web service
 	e := echo.New()
 	restful.InitFmanHandler(e, fmanUC)

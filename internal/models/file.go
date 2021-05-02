@@ -12,9 +12,6 @@ type File struct {
 	// Name of the file.
 	Filename string
 
-	// Is the file is a directory.
-	IsDir bool
-
 	// Human-readable path of the file.
 	Path string
 
@@ -24,9 +21,39 @@ type File struct {
 	// Parent directory UUID.
 	ParentUUID string
 
+	// Size of the file.
+	FileSize uint64
+
 	// Time when the file is created.
 	CreatedAt time.Time
 
 	// Time of the last file update.
 	UpdatedAt time.Time
+}
+
+// Directory holds properties of a directory/folder.
+type Directory struct {
+	// UUID of the directory.
+	UUID string
+
+	// Name of the directory.
+	Dirname string
+
+	// Human-readable path of the directory.
+	Path string
+
+	// Parent directory UUID.
+	ParentUUID string
+
+	// Time when the directory is created.
+	CreatedAt time.Time
+
+	// Time of the last directory update.
+	UpdatedAt time.Time
+
+	// A list of child-files.
+	ListOfFiles []File
+
+	// A list of child-dirs.
+	ListOfDirs []Directory
 }

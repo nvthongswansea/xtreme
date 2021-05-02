@@ -10,7 +10,7 @@ import (
 // FileSaveReadRemover provides an interface to save/read/remove a file to/from/from a source.
 type FileSaveReadRemover interface {
 	// Save file to a source.
-	SaveFile(filename string, contentReader io.Reader) error
+	SaveFile(filename string, contentReader io.Reader) (int64, string, error)
 
 	// ReadFile returns an instance of io.ReadCloser. Data can be read from the instance via
 	// Read() function. NOTE: Remember to Close() after reading the content.
@@ -31,25 +31,26 @@ func CreateNewLocalFileOperator(basePath string) *LocalFileOperator {
 	}
 }
 
-// SaveFile saves a file from a reader to the local disk. If the filename already exists,
-// return error.
-func (fs *LocalFileOperator) SaveFile(filename string, contentReader io.Reader) error {
+// SaveFile saves a file from a reader to the local disk, return the number of bytes
+// saved on the local disk and the location of the file.
+// If the filename already exists, return error.
+func (fs *LocalFileOperator) SaveFile(filename string, contentReader io.Reader) (int64, string, error) {
 	// filePathOD filepath on disk.
 	filePathOD := filepath.Join(fs.basePath, filename)
 	// Check if the file already exists.
 	if _, err := os.Stat(filePathOD); err == nil {
 		// Return error if the file already exists.
-		return fmt.Errorf("File %s already exist", filePathOD)
+		return 0, "", fmt.Errorf("File %s already exist", filePathOD)
 	}
 	// Create a new empty dst file.
 	dstF, err := os.Create(filePathOD)
 	if err != nil {
-		return err
+		return 0, "", err
 	}
 	defer dstF.Close()
 	// Copy content to the dst file.
-	_, err = io.Copy(dstF, contentReader)
-	return err
+	size, err := io.Copy(dstF, contentReader)
+	return size, filePathOD, err
 }
 
 // ReadFile returns an os.File pointer with a given filename, which can be only used for reading the file content from the

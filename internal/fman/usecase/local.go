@@ -5,99 +5,132 @@ import (
 	"io"
 
 	"github.com/nvthongswansea/xtreme/internal/fman"
-	"github.com/nvthongswansea/xtreme/internal/models"
 	fileUtils "github.com/nvthongswansea/xtreme/pkg/file-utils"
 	uuidUtils "github.com/nvthongswansea/xtreme/pkg/uuid-utils"
 )
 
 // FManLocalUsecase provides usecase(logic) for file manager on local storage.
 type FManLocalUsecase struct {
-	dbRepo  fman.FManDBRepo
-	uuidGen uuidUtils.UUIDGenerator
-	fileOps fileUtils.FileSaveReadRemover
+	dbFileRepo fman.FManFileDBRepo
+	dbDirRepo  fman.FManDirDBRepo
+	dbValRepo  fman.FManValidator
+	uuidGen    uuidUtils.UUIDGenerator
+	fileOps    fileUtils.FileSaveReadRemover
 }
 
 // NewFManLocalUsecase create a new FManLocalUsecase.
-func NewFManLocalUsecase(dbRepo fman.FManDBRepo, uuidGen uuidUtils.UUIDGenerator, fileOps fileUtils.FileSaveReadRemover) *FManLocalUsecase {
+func NewFManLocalUsecase(dbFileRepo fman.FManFileDBRepo, dbDirRepo fman.FManDirDBRepo, dbValRepo fman.FManValidator,
+	uuidGen uuidUtils.UUIDGenerator, fileOps fileUtils.FileSaveReadRemover) *FManLocalUsecase {
 	return &FManLocalUsecase{
-		dbRepo,
+		dbFileRepo,
+		dbDirRepo,
+		dbValRepo,
 		uuidGen,
 		fileOps,
 	}
 }
 
-func (u *FManLocalUsecase) UploadFile(newFile models.File, contentReader io.Reader) error {
+func (u *FManLocalUsecase) UploadFile(filename, parentUUID string, contentReader io.Reader) error {
+	// Validate parent UUID.
+	parentUUIDok, err := u.dbValRepo.IsParentUUIDExist(parentUUID)
+	if err != nil {
+		return err
+	}
+	if !parentUUIDok {
+		return fmt.Errorf("parent UUID (%s) does not exist", parentUUID)
+	}
 	// Check if the file already exists in a desired location in the db.
-	isExist, err := u.dbRepo.IsFileRecordExist(newFile)
+	isExist, err := u.dbValRepo.IsNameExist(filename, parentUUID)
 	if err != nil {
 		return err
 	}
 	if isExist {
-		return fmt.Errorf("%s already exist in the desired location", newFile.Filename)
+		return fmt.Errorf("%s already exists in the desired location", filename)
 	}
 	// Generate a new UUID.
-	newFile.UUID = u.uuidGen.NewUUID()
+	newFileUUID := u.uuidGen.NewUUID()
 	// Save file to the disk.
-	err = u.fileOps.SaveFile(newFile.UUID, contentReader)
+	size, realPath, err := u.fileOps.SaveFile(newFileUUID, contentReader)
 	if err != nil {
 		return err
 	}
 	// Insert new file record to the DB.
-	if _, err := u.dbRepo.InsertFileRecord(newFile); err != nil {
+	if err := u.dbFileRepo.InsertFileRecord(newFileUUID, filename, parentUUID, realPath, size); err != nil {
 		// If error reprents while inserting a new record,
 		// remove the file from the storage.
-		return u.fileOps.RemoveFile(newFile.UUID)
+		return u.fileOps.RemoveFile(newFileUUID)
 	}
 	return err
 }
 
-func (u *FManLocalUsecase) CopyFile(dstFile models.File, srcFile models.File) error {
+func (u *FManLocalUsecase) CopyFile(srcUUID, dstParentUUID string) error {
+	// Validate parent UUID.
+	parentUUIDok, err := u.dbValRepo.IsParentUUIDExist(dstParentUUID)
+	if err != nil {
+		return err
+	}
+	if !parentUUIDok {
+		return fmt.Errorf("parent UUID (%s) does not exist", dstParentUUID)
+	}
+	// Get the source filename.
+	srcFile, err := u.dbFileRepo.ReadFileRecord(srcUUID)
+	if err != nil {
+		return err
+	}
 	// Check if the file already exists in a desired location in the db.
-	isExist, err := u.dbRepo.IsFileRecordExist(dstFile)
+	isExist, err := u.dbValRepo.IsNameExist(srcFile.Filename, dstParentUUID)
 	if err != nil {
 		return err
 	}
 	if isExist {
-		return fmt.Errorf("%s already exist in the desired location", dstFile.Filename)
+		return fmt.Errorf("%s already exists in the desired location", srcFile.Filename)
 	}
 	// Generate a new UUID for the destination file.
-	dstFile.UUID = u.uuidGen.NewUUID()
+	newFileUUID := u.uuidGen.NewUUID()
 	// Get source file pointer to read its content.
-	srcFReadCloser, err := u.fileOps.ReadFile(srcFile.Filename)
+	srcFReadCloser, err := u.fileOps.ReadFile(srcUUID)
 	if err != nil {
 		return err
 	}
 	defer srcFReadCloser.Close()
 	// Save the dst file to the disk.
-	err = u.fileOps.SaveFile(dstFile.UUID, srcFReadCloser)
+	size, realPath, err := u.fileOps.SaveFile(newFileUUID, srcFReadCloser)
 	if err != nil {
 		return err
 	}
 	// Insert a new file record to the DB.
-	if _, err = u.dbRepo.InsertFileRecord(dstFile); err != nil {
+	if err = u.dbFileRepo.InsertFileRecord(newFileUUID, srcFile.Filename, dstParentUUID, realPath, size); err != nil {
 		// If error reprents while inserting a new record,
 		// remove the file from the storage.
-		return u.fileOps.RemoveFile(dstFile.UUID)
+		return u.fileOps.RemoveFile(newFileUUID)
 	}
 	return err
 }
 
-func (u *FManLocalUsecase) CreateNewDirectory(newDir models.File) error {
+func (u *FManLocalUsecase) CreateNewDirectory(dirname, parentUUID string) error {
+	// Validate parent UUID.
+	parentUUIDok, err := u.dbValRepo.IsParentUUIDExist(parentUUID)
+	if err != nil {
+		return err
+	}
+	if !parentUUIDok {
+		return fmt.Errorf("parent UUID (%s) does not exist", parentUUID)
+	}
 	// Check if the directory already exists in a desired location in the db.
-	isExist, err := u.dbRepo.IsFileRecordExist(newDir)
+	isExist, err := u.dbValRepo.IsNameExist(dirname, parentUUID)
 	if err != nil {
 		return err
 	}
 	if isExist {
-		return fmt.Errorf("%s already exist in the desired location", newDir.Filename)
+		return fmt.Errorf("%s already exists in the desired location", dirname)
 	}
 	// Generate a new UUID.
-	newDir.UUID = u.uuidGen.NewUUID()
+	newDirUUID := u.uuidGen.NewUUID()
 	// Insert new file record to the DB.
-	if _, err := u.dbRepo.InsertFileRecord(newDir); err != nil {
+	if err := u.dbDirRepo.InsertDirRecord(newDirUUID, dirname, parentUUID); err != nil {
 		// If error reprents while inserting a new record,
 		// remove the file from the storage.
-		return u.fileOps.RemoveFile(newDir.UUID)
+		return u.fileOps.RemoveFile(newDirUUID)
 	}
 	return err
 }
