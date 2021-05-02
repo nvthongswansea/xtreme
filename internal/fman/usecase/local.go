@@ -34,7 +34,11 @@ func (u *FManLocalUsecase) UploadFile(newFile models.File, contentReader io.Read
 		return err
 	}
 	// Insert new file record to the DB.
-	_, err = u.dbRepo.InsertFileRecord(newFile)
+	if _, err := u.dbRepo.InsertFileRecord(newFile); err != nil {
+		// If error reprents while inserting a new record,
+		// remove the file from the storage.
+		return u.fileOps.RemoveFile(newFile.UUID)
+	}
 	return err
 }
 
