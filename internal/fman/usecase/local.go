@@ -29,6 +29,9 @@ func NewFManLocalUsecase(dbRepo fman.FManDBRepo, uuidGen uuidUtils.UUIDGenerator
 func (u *FManLocalUsecase) UploadFile(newFile models.File, contentReader io.Reader) error {
 	// Check if the file already exists in a desired location in the db.
 	isExist, err := u.dbRepo.IsFileRecordExist(newFile)
+	if err != nil {
+		return err
+	}
 	if isExist {
 		return fmt.Errorf("%s already exist in the desired location", newFile.Filename)
 	}
@@ -51,6 +54,9 @@ func (u *FManLocalUsecase) UploadFile(newFile models.File, contentReader io.Read
 func (u *FManLocalUsecase) CopyFile(dstFile models.File, srcFile models.File) error {
 	// Check if the file already exists in a desired location in the db.
 	isExist, err := u.dbRepo.IsFileRecordExist(dstFile)
+	if err != nil {
+		return err
+	}
 	if isExist {
 		return fmt.Errorf("%s already exist in the desired location", dstFile.Filename)
 	}
