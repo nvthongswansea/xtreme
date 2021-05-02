@@ -49,6 +49,11 @@ func (u *FManLocalUsecase) UploadFile(newFile models.File, contentReader io.Read
 }
 
 func (u *FManLocalUsecase) CopyFile(dstFile models.File, srcFile models.File) error {
+	// Check if the file already exists in a desired location in the db.
+	isExist, err := u.dbRepo.IsFileRecordExist(dstFile)
+	if isExist {
+		return fmt.Errorf("%s already exist in the desired location", dstFile.Filename)
+	}
 	// Generate a new UUID for the destination file.
 	dstFile.UUID = u.uuidGen.NewUUID()
 	// Get source file pointer to read its content.
@@ -63,7 +68,11 @@ func (u *FManLocalUsecase) CopyFile(dstFile models.File, srcFile models.File) er
 		return err
 	}
 	// Insert a new file record to the DB.
-	_, err = u.dbRepo.InsertFileRecord(dstFile)
+	if _, err = u.dbRepo.InsertFileRecord(dstFile); err != nil {
+		// If error reprents while inserting a new record,
+		// remove the file from the storage.
+		return u.fileOps.RemoveFile(dstFile.UUID)
+	}
 	return err
 }
 
