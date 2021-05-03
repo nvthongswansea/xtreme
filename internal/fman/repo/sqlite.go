@@ -10,15 +10,15 @@ func NewFManSQLiteRepo() *FManSQLiteRepo {
 }
 
 // InsertFileRecord insert a new file record to SQLite DB.
-func (m *FManSQLiteRepo) InsertFileRecord(newFile models.File) (models.File, error) {
-	return models.File{}, nil
+func (m *FManSQLiteRepo) InsertFileRecord(UUID, filename, parentUUID, realPath string, fileSize int64) error {
+	return nil
 }
 
 func (m *FManSQLiteRepo) ReadFileRecord(UUID string) (models.File, error) {
 	return models.File{}, nil
 }
 
-func (m *FManSQLiteRepo) UpdateFileRecord(file models.File) error {
+func (m *FManSQLiteRepo) UpdateFileRecord(filename, parentUUID string) error {
 	return nil
 }
 
@@ -28,4 +28,32 @@ func (m *FManSQLiteRepo) SoftRemoveFileRecord(UUID string) error {
 
 func (m *FManSQLiteRepo) HardRemoveFileRecord(UUID string) error {
 	return nil
+}
+
+func (m *FManSQLiteRepo) InsertDirRecord(UUID, dirname, parentUUID string) error {
+	return nil
+}
+
+func (m *FManSQLiteRepo) ReadDirRecord(UUID string) (models.Directory, error) {
+	return models.Directory{}, nil
+}
+
+func (m *FManSQLiteRepo) UpdateDirRecord(filename, parentUUID string) error {
+	return nil
+}
+
+func (m *FManSQLiteRepo) SoftRemoveDirRecord(UUID string) error {
+	return nil
+}
+
+func (m *FManSQLiteRepo) HardRemoveDirRecord(UUID string) error {
+	return nil
+}
+
+func (m *FManSQLiteRepo) IsNameExist(filename, parentUUID string) (bool, error) {
+	return false, nil
+}
+
+func (m *FManSQLiteRepo) IsParentUUIDExist(parentUUID string) (bool, error) {
+	return true, nil
 }

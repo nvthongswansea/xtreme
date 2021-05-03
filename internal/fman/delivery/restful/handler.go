@@ -5,7 +5,6 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/nvthongswansea/xtreme/internal/fman"
-	"github.com/nvthongswansea/xtreme/internal/models"
 )
 
 // ResponseError represents http response error in JSON format
@@ -37,8 +36,10 @@ func (h *FmanHandler) UploadNewFile(c echo.Context) error {
 	}
 	defer src.Close()
 
+	filename := c.FormValue("filename")
+	parentUUID := c.FormValue("parent_uuid")
 	// Save file
-	err = h.FmanUsecase.UploadFile(models.File{}, src)
+	err = h.FmanUsecase.UploadFile(filename, parentUUID, src)
 	if err != nil {
 		return err
 	}
