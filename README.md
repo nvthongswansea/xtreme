@@ -1,3 +1,3 @@
 TO-DO
 
-Run: `go run main.go -base_path="/path/to/save/files"`
+Run: `go run main.go -config_file="/path/to/config_file.yml"`
