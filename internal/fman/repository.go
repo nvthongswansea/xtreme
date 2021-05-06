@@ -30,7 +30,7 @@ type FManDirDBRepo interface {
 	ReadDirRecord(UUID string) (models.Directory, error)
 
 	// UpdateDirRecord updates a directory/folder record in the db.
-	UpdateDirRecord(filename, parentUUID string) error
+	UpdateDirRecord(dirname, parentUUID string) error
 
 	// SoftRemoveDirRecord flags a directory/folder record as deleted file.
 	// e.g. set `is_deleted` field to true.

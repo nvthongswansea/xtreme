@@ -2,7 +2,6 @@ package restful
 
 import (
 	"net/http"
-
 	"github.com/labstack/echo/v4"
 	"github.com/nvthongswansea/xtreme/internal/fman"
 )
@@ -38,6 +37,7 @@ func (h *FmanHandler) UploadNewFile(c echo.Context) error {
 
 	filename := c.FormValue("filename")
 	parentUUID := c.FormValue("parent_uuid")
+
 	// Save file
 	err = h.FmanUsecase.UploadFile(filename, parentUUID, src)
 	if err != nil {
