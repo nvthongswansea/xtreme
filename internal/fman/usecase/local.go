@@ -14,7 +14,7 @@ import (
 type FManLocalUsecase struct {
 	dbFileRepo fman.FManFileDBRepo
 	dbDirRepo  fman.FManDirDBRepo
-	dbValRepo  fman.FManValidator
+	dbValRepo  fman.FManValidateDBRepo
 	uuidGen    uuidUtils.UUIDGenerator
 	fileOps    fileUtils.FileSaveReadRemover
 }
