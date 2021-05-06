@@ -58,9 +58,13 @@ func (u *FManLocalUsecase) UploadFile(filename, parentUUID string, contentReader
 	if err := u.dbFileRepo.InsertFileRecord(newFileUUID, filename, parentUUID, realPath, size); err != nil {
 		// If error reprents while inserting a new record,
 		// remove the file from the storage.
-		return u.fileOps.RemoveFile(newFileUUID)
+		defer func() {
+			// TODO: Log
+			_ = u.fileOps.RemoveFile(newFileUUID)
+		}()
+		return err
 	}
-	return err
+	return nil
 }
 
 func (u *FManLocalUsecase) CopyFile(srcUUID, dstParentUUID string) error {
@@ -102,9 +106,13 @@ func (u *FManLocalUsecase) CopyFile(srcUUID, dstParentUUID string) error {
 	if err = u.dbFileRepo.InsertFileRecord(newFileUUID, srcFile.Filename, dstParentUUID, realPath, size); err != nil {
 		// If error reprents while inserting a new record,
 		// remove the file from the storage.
-		return u.fileOps.RemoveFile(newFileUUID)
+		defer func() {
+			// TODO: Log
+			_ = u.fileOps.RemoveFile(newFileUUID)
+		}()
+		return err
 	}
-	return err
+	return nil
 }
 
 func (u *FManLocalUsecase) CreateNewDirectory(dirname, parentUUID string) error {
@@ -128,11 +136,9 @@ func (u *FManLocalUsecase) CreateNewDirectory(dirname, parentUUID string) error 
 	newDirUUID := u.uuidGen.NewUUID()
 	// Insert new file record to the DB.
 	if err := u.dbDirRepo.InsertDirRecord(newDirUUID, dirname, parentUUID); err != nil {
-		// If error reprents while inserting a new record,
-		// remove the file from the storage.
-		return u.fileOps.RemoveFile(newDirUUID)
+		return err
 	}
-	return err
+	return nil
 }
 
 func (u *FManLocalUsecase) MoveFile() {
