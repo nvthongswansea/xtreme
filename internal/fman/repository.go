@@ -40,7 +40,8 @@ type FManDirDBRepo interface {
 	HardRemoveDirRecord(UUID string) error
 }
 
-type FManValidator interface {
+// FManValidateDBRepo provides an interface for operations on data validation via db.
+type FManValidateDBRepo interface {
 	// IsNameExist checks if a specific file/dir's name exists in a specific path.
 	IsNameExist(filename, parentUUID string) (bool, error)
 

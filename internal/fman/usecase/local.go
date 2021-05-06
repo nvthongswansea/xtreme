@@ -20,7 +20,7 @@ type FManLocalUsecase struct {
 }
 
 // NewFManLocalUsecase create a new FManLocalUsecase.
-func NewFManLocalUsecase(dbFileRepo fman.FManFileDBRepo, dbDirRepo fman.FManDirDBRepo, dbValRepo fman.FManValidator,
+func NewFManLocalUsecase(dbFileRepo fman.FManFileDBRepo, dbDirRepo fman.FManDirDBRepo, dbValRepo fman.FManValidateDBRepo,
 	uuidGen uuidUtils.UUIDGenerator, fileOps fileUtils.FileSaveReadRemover) *FManLocalUsecase {
 	return &FManLocalUsecase{
 		dbFileRepo,
