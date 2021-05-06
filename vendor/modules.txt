@@ -17,6 +17,9 @@ github.com/labstack/gommon/random
 github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.12
 github.com/mattn/go-isatty
+# github.com/sirupsen/logrus v1.8.1
+## explicit
+github.com/sirupsen/logrus
 # github.com/valyala/bytebufferpool v1.0.0
 github.com/valyala/bytebufferpool
 # github.com/valyala/fasttemplate v1.2.1
@@ -36,6 +39,7 @@ golang.org/x/net/idna
 ## explicit
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
+golang.org/x/sys/windows
 # golang.org/x/text v0.3.6
 golang.org/x/text/secure/bidirule
 golang.org/x/text/transform

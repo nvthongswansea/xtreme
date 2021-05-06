@@ -9,8 +9,6 @@ type FmanUsecase interface {
 	// Update a file.
 	UploadFile(filename, parentUUID string, contentReader io.Reader) error
 
-	//
-
 	// Copy a file to a new location.
 	CopyFile(srcUUID, dstParentUUID string) error
 
