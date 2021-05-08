@@ -9,14 +9,14 @@ import (
 
 // FileSaveReadRemover provides an interface to save/read/remove a file to/from/from a source.
 type FileSaveReadRemover interface {
-	// Save file to a source.
-	SaveFile(relFilePath string, contentReadCloser io.ReadCloser) (int64, string, error)
+	// SaveCloseFile Save file to a source, then close contentReadCloser.
+	SaveCloseFile(relFilePath string, contentReadCloser io.ReadCloser) (int64, string, error)
 
 	// ReadFile returns an instance of io.ReadCloser. Data can be read from the instance via
 	// Read() function. NOTE: Remember to Close() after reading the content.
 	ReadFile(relFilePath string) (io.ReadCloser, error)
 
-	// Remove a file from a source.
+	// RemoveFile removes a file from a source.
 	RemoveFile(relFilePath string) error
 }
 
@@ -31,10 +31,11 @@ func CreateNewLocalFileOperator(basePath string) *LocalFileOperator {
 	}
 }
 
-// SaveFile saves a file from a reader to the local disk, return the number of bytes
-// saved on the local disk and the location of the file.
+// SaveCloseFile saves a file from a reader to the local disk, and close
+// contentReadCloser. Return the number of bytes
+// saved on the local disk and the absolute location of the file.
 // If the filename already exists, return error.
-func (fs *LocalFileOperator) SaveFile(relFilePath string, contentReadCloser io.ReadCloser) (int64, string, error) {
+func (fs *LocalFileOperator) SaveCloseFile(relFilePath string, contentReadCloser io.ReadCloser) (int64, string, error) {
 	defer contentReadCloser.Close()
 	// absolute filepath on disk.
 	absFilePathOD := filepath.Join(fs.basePath, relFilePath)
