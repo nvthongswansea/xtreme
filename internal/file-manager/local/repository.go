@@ -1,50 +1,57 @@
-package fman
+package local
 
-import "github.com/nvthongswansea/xtreme/internal/models"
+import (
+	"context"
 
-// FManFileDBRepo provides an interface for operations on file in the database.
-type FManFileDBRepo interface {
+	"github.com/nvthongswansea/xtreme/internal/models"
+)
+
+// LocalFManDBRepo provides an interface for operations on files/directories in the database.
+type LocalFManDBRepo interface {
 	// InsertFileRecord inserts a file record to db.
-	InsertFileRecord(UUID, filename, parentUUID, realPath string, fileSize int64) error
+	InsertFileRecord(ctx context.Context, userUUID, fileUUID, filename, parentUUID, realPath string, fileSize int64) error
 
-	// ReadFileRecord reads a file record from the db with a given UUID.
-	ReadFileRecord(UUID string) (models.File, error)
+	// GetFileRecord gets a file record from the db with a given UUID.
+	GetFileRecord(ctx context.Context, userUUID, fileUUID string) (models.FileMetadata, error)
+
+	// GetFileRecordBatch gets multiple file records from the db with given UUIDs.
+	GetFileRecordBatch(ctx context.Context, userUUID string, fileUUIDs []string) ([]models.FileMetadata, error)
+
+	// Get a file/directory's UUID by a given path.
+	GetUUIDByPath(ctx context.Context, userUUID, path string) (string, error)
+
+	// Search all files/directories based on given filename within a specific path.
+	SearchByName(ctx context.Context, userUUID, filename, parentDirUUID string) ([]models.FileMetadata, []models.DirectoryMetadata, error)
 
 	// UpdateFileRecord updates a file record in the db.
-	UpdateFileRecord(filename, parentUUID string) error
+	UpdateFileRecord(ctx context.Context, userUUID, newFileName, parentUUID string) error
 
 	// SoftRemoveFileRecord flags a file record as deleted file.
 	// e.g. set `is_deleted` field to true.
-	SoftRemoveFileRecord(UUID string) error
+	SoftRemoveFileRecord(ctx context.Context, userUUID, fileUUID string) error
 
 	// HardRemoveFileRecord removes a file record completely from the db.
-	HardRemoveFileRecord(UUID string) error
-}
+	HardRemoveFileRecord(ctx context.Context, userUUID, fileUUID string) error
 
-// FManDirDBRepo provides an interface for operations on directory/folder in the database.
-type FManDirDBRepo interface {
 	// InsertDirRecord inserts a directory/folder record to db.
-	InsertDirRecord(UUID, dirname, parentUUID string) error
+	InsertDirRecord(ctx context.Context, userUUID, dirUUID, dirname, parentUUID string) error
 
-	// ReadDirRecord reads a directory/folder record from the db with a given UUID.
-	ReadDirRecord(UUID string) (models.Directory, error)
+	// GetDirRecord gets a directory/folder record from the db with a given UUID.
+	GetDirRecord(ctx context.Context, userUUID, dirUUID string) (models.DirectoryMetadata, error)
 
 	// UpdateDirRecord updates a directory/folder record in the db.
-	UpdateDirRecord(filename, parentUUID string) error
+	UpdateDirRecord(ctx context.Context, userUUID, newDirName, parentUUID string) error
 
 	// SoftRemoveDirRecord flags a directory/folder record as deleted file.
 	// e.g. set `is_deleted` field to true.
-	SoftRemoveDirRecord(UUID string) error
+	SoftRemoveDirRecord(ctx context.Context, userUUID, dirUUID string) error
 
 	// HardRemoveDirRecord removes a directory/folder record completely from the db.
-	HardRemoveDirRecord(UUID string) error
-}
+	HardRemoveDirRecord(ctx context.Context, userUUID, dirUUID string) error
 
-// FManValidateDBRepo provides an interface for operations on data validation via db.
-type FManValidateDBRepo interface {
-	// IsNameExist checks if a specific file/dir's name exists in a specific path.
-	IsNameExist(filename, parentUUID string) (bool, error)
+	// IsNameExist checks if a specific file/dir's name exists in a specific directory.
+	IsNameExist(ctx context.Context, userUUID, name, parentDirUUID string) (bool, error)
 
-	// IsParentUUIDExist checks if a parent UUID exists.
-	IsParentUUIDExist(parentUUID string) (bool, error)
+	// IsParentDirExist checks if a parent directory UUID exists.
+	IsParentDirExist(ctx context.Context, userUUID, parentDirUUID string) (bool, error)
 }

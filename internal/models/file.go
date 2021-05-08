@@ -1,11 +1,13 @@
 package models
 
 import (
+	"io"
+	"os"
 	"time"
 )
 
-// File holds properties of a File.
-type File struct {
+// FileMetadata holds metadata of a File.
+type FileMetadata struct {
 	// UUID of the file.
 	UUID string
 
@@ -22,7 +24,7 @@ type File struct {
 	ParentUUID string
 
 	// Size of the file.
-	FileSize uint64
+	FileSize int64
 
 	// Time when the file is created.
 	CreatedAt time.Time
@@ -31,8 +33,8 @@ type File struct {
 	UpdatedAt time.Time
 }
 
-// Directory holds properties of a directory/folder.
-type Directory struct {
+// DirectoryMetadata holds metadata of a directory/folder.
+type DirectoryMetadata struct {
 	// UUID of the directory.
 	UUID string
 
@@ -52,8 +54,23 @@ type Directory struct {
 	UpdatedAt time.Time
 
 	// A list of child-files.
-	ListOfFiles []File
+	ListOfFiles []FileMetadata
 
 	// A list of child-dirs.
-	ListOfDirs []Directory
+	ListOfDirs []DirectoryMetadata
+}
+
+// FilePayload holds content reader of a file.
+type FilePayload struct {
+	Filename      string
+	ContentLength int64
+	ReadCloser    io.ReadCloser
+}
+
+// TmpFilePayload holds content reader of a temp file.
+// With *os.File, the temp file can be removed after use.
+type TmpFilePayload struct {
+	Filename      string
+	ContentLength int64
+	File          *os.File
 }

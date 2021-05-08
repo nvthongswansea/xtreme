@@ -14,10 +14,10 @@ type FileSaveReadRemover interface {
 
 	// ReadFile returns an instance of io.ReadCloser. Data can be read from the instance via
 	// Read() function. NOTE: Remember to Close() after reading the content.
-	ReadFile(relFilePath string) (io.ReadCloser, error)
+	ReadFile(absFilePathOD string) (io.ReadCloser, error)
 
 	// RemoveFile removes a file from a source.
-	RemoveFile(relFilePath string) error
+	RemoveFile(absFilePathOD string) error
 }
 
 type LocalFileOperator struct {
@@ -57,15 +57,11 @@ func (fs *LocalFileOperator) SaveCloseFile(relFilePath string, contentReadCloser
 
 // ReadFile returns an os.File pointer with a given filename, which can be only used for reading the file content from the
 // local storage.
-func (fs *LocalFileOperator) ReadFile(relFilePath string) (io.ReadCloser, error) {
-	// absolute filepath on disk.
-	absFilePathOD := filepath.Join(fs.basePath, relFilePath)
+func (fs *LocalFileOperator) ReadFile(absFilePathOD string) (io.ReadCloser, error) {
 	return os.Open(absFilePathOD)
 }
 
 // RemoveFile removes a file from the local disk.
-func (fs *LocalFileOperator) RemoveFile(relFilePath string) error {
-	// absolute filepath on disk.
-	absFilePathOD := filepath.Join(fs.basePath, relFilePath)
+func (fs *LocalFileOperator) RemoveFile(absFilePathOD string) error {
 	return os.Remove(absFilePathOD)
 }
