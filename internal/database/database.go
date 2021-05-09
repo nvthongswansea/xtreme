@@ -12,7 +12,7 @@ type Repository interface {
 	DBEntitySearcher
 	DBEntityUpdater
 	DBEntityRemover
-	DBEntityExistenceChecker
+	DBEntityValidator
 }
 
 // LocalFManRepository holds all operations on the db,
@@ -23,7 +23,7 @@ type LocalFManRepository interface {
 	DBEntitySearcher
 	DBEntityMetadataUpdater
 	DBEntityRemover
-	DBEntityExistenceChecker
+	DBEntityValidator
 }
 
 // DBEntityInserter holds inserting operations on db.
@@ -45,11 +45,14 @@ type DBEntityGetter interface {
 	// GetFile gets a file record from the db with a given UUID.
 	GetFile(ctx context.Context, userUUID, fileUUID string) (models.File, error)
 
+	// GetDirectory gets a directory/folder record from the db with a given UUID.
+	GetDirectory(ctx context.Context, userUUID, dirUUID string) (models.Directory, error)
+
 	// GetUUIDByPath gets a file/directory's UUID by a given path.
 	GetUUIDByPath(ctx context.Context, userUUID, path string) (string, error)
 
-	// GetDirectory gets a directory/folder record from the db with a given UUID.
-	GetDirectory(ctx context.Context, userUUID, dirUUID string) (models.Directory, error)
+	// GetChildFileUUIDs gets all child-files' UUIDs in a given directory.
+	GetChildFileUUIDs(ctx context.Context, userUUID, dirUUID string) ([]string, error)
 
 	DBEntityMetadataGetter
 }
@@ -82,28 +85,37 @@ type DBEntityMetadataUpdater interface {
 
 // DBEntityRemover holds removing operations on db.
 type DBEntityRemover interface {
-	// SoftRemoveFileRecord flags a file record as deleted file.
+	// SoftRemoveFile flags a file record as deleted file.
 	// e.g. set `is_deleted` field to true.
-	SoftRemoveFileRecord(ctx context.Context, userUUID, fileUUID string) error
+	SoftRemoveFile(ctx context.Context, userUUID, fileUUID string) error
 
-	// HardRemoveFileRecord removes a file record completely from the db.
-	HardRemoveFileRecord(ctx context.Context, userUUID, fileUUID string) error
+	// HardRemoveFile removes a file record completely from the db.
+	HardRemoveFile(ctx context.Context, userUUID, fileUUID string, fileRmCallback func(string) error) error
 
-	// SoftRemoveDirRecord flags a directory/folder record as deleted file.
+	// SoftRemoveDir flags a directory/folder record as deleted file.
 	// e.g. set `is_deleted` field to true.
-	SoftRemoveDirRecord(ctx context.Context, userUUID, dirUUID string) error
+	SoftRemoveDir(ctx context.Context, userUUID, dirUUID string) error
 
-	// HardRemoveDirRecord removes a directory/folder record completely from the db.
-	HardRemoveDirRecord(ctx context.Context, userUUID, dirUUID string) error
+	// HardRemoveDir removes a directory/folder record completely from the db.
+	HardRemoveDir(ctx context.Context, userUUID, dirUUID string, fileRmCallback func(string) error) error
 }
 
-// DBEntityExistenceChecker holds validating operations on db.
-type DBEntityExistenceChecker interface {
+// DBEntityValidator holds validating operations on db.
+type DBEntityValidator interface {
 	// IsNameExist checks if a specific file/dir's name exists in a specific directory.
 	IsNameExist(ctx context.Context, userUUID, name, parentDirUUID string) (bool, error)
 
+	// IsUserUUIDExist checks if a user UUID exists.
+	IsUserUUIDExist(ctx context.Context, userUUID string) (bool, error)
+
+	// IsFileExist checks if a file UUID exists.
+	IsFileExist(ctx context.Context, userUUID, fileUUID string) (bool, error)
+
 	// IsDirExist checks if a parent directory UUID exists.
 	IsDirExist(ctx context.Context, userUUID, parentDirUUID string) (bool, error)
+
+	// IsRootDir checks if the given directory is a root directory.
+	IsRootDir(ctx context.Context, userUUID, dirUUID string) (bool, error)
 }
 
 // DBEntitySearcher holds searching operations on db.

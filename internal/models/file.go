@@ -8,7 +8,7 @@ import (
 
 // File holds metadata and description of a file.
 type File struct {
-	Metadata FileMetadata`json:"metadata"`
+	Metadata    FileMetadata    `json:"metadata"`
 	Description FileDescription `json:"description"`
 }
 

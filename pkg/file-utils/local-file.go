@@ -69,9 +69,6 @@ func (fs *LocalFileOperator) RemoveFile(absFilePathOD string) error {
 	return os.Remove(absFilePathOD)
 }
 
-// FilenameValidator is signature of a func to validate the filename.
-type FilenameValidator func(filename string) bool
-
 // IsFilenameOk checks if filename is valid. If the filename doesn't
 // contain any prohibited characters, return true; otherwise
 // return false

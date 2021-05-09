@@ -49,8 +49,8 @@ type LocalFManServiceHandler interface {
 	// Create a new directory/folder.
 	CreateNewDirectory(ctx context.Context, userUUID, dirname, parentDirUUID string) (string, error)
 
-	// Get a directory metadata.
-	GetDirectoryMeta(ctx context.Context, userUUID, dirUUID string) (models.Directory, error)
+	// Get a directory.
+	GetDirectory(ctx context.Context, userUUID, dirUUID string) (models.Directory, error)
 
 	// Copy a directory/folder to a new location.
 	CopyDirectory(ctx context.Context, userUUID, dirUUID, dstParentDirUUID string) (string, error)

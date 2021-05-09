@@ -5,7 +5,7 @@ import "time"
 // Directory holds metadata and content of a directory/folder.
 type Directory struct {
 	Metadata DirectoryMetadata `json:"metadata"`
-	Content DirectoryContent `json:"content"`
+	Content  DirectoryContent  `json:"content"`
 }
 
 // DirectoryMetadata holds metadata of a directory/folder.
