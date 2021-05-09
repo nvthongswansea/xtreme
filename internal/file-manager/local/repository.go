@@ -12,16 +12,16 @@ type LocalFManDBRepo interface {
 	InsertFileRecord(ctx context.Context, userUUID, fileUUID, filename, parentUUID, realPath string, fileSize int64) error
 
 	// GetFileRecord gets a file record from the db with a given UUID.
-	GetFileRecord(ctx context.Context, userUUID, fileUUID string) (models.FileMetadata, error)
+	GetFile(ctx context.Context, userUUID, fileUUID string) (models.File, error)
 
 	// GetFileRecordBatch gets multiple file records from the db with given UUIDs.
-	GetFileRecordBatch(ctx context.Context, userUUID string, fileUUIDs []string) ([]models.FileMetadata, error)
+	GetFileBatch(ctx context.Context, userUUID string, fileUUIDs []string) ([]models.File, error)
 
 	// Get a file/directory's UUID by a given path.
 	GetUUIDByPath(ctx context.Context, userUUID, path string) (string, error)
 
 	// Search all files/directories based on given filename within a specific path.
-	SearchByName(ctx context.Context, userUUID, filename, parentDirUUID string) ([]models.FileMetadata, []models.DirectoryMetadata, error)
+	SearchByName(ctx context.Context, userUUID, filename, parentDirUUID string) ([]models.File, []models.Directory, error)
 
 	// UpdateFileRecord updates a file record in the db.
 	UpdateFileRecord(ctx context.Context, userUUID, newFileName, parentUUID string) error
@@ -37,7 +37,7 @@ type LocalFManDBRepo interface {
 	InsertDirRecord(ctx context.Context, userUUID, dirUUID, dirname, parentUUID string) error
 
 	// GetDirRecord gets a directory/folder record from the db with a given UUID.
-	GetDirRecord(ctx context.Context, userUUID, dirUUID string) (models.DirectoryMetadata, error)
+	GetDirectory(ctx context.Context, userUUID, dirUUID string) (models.Directory, error)
 
 	// UpdateDirRecord updates a directory/folder record in the db.
 	UpdateDirRecord(ctx context.Context, userUUID, newDirName, parentUUID string) error
@@ -52,6 +52,6 @@ type LocalFManDBRepo interface {
 	// IsNameExist checks if a specific file/dir's name exists in a specific directory.
 	IsNameExist(ctx context.Context, userUUID, name, parentDirUUID string) (bool, error)
 
-	// IsParentDirExist checks if a parent directory UUID exists.
-	IsParentDirExist(ctx context.Context, userUUID, parentDirUUID string) (bool, error)
+	// IsDirExist checks if a parent directory UUID exists.
+	IsDirExist(ctx context.Context, userUUID, parentDirUUID string) (bool, error)
 }

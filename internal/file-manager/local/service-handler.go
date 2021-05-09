@@ -27,8 +27,8 @@ type LocalFManServiceHandler interface {
 	// Move a file.
 	MoveFile(ctx context.Context, userUUID, fileUUID, dstParentDirUUID string) (string, error)
 
-	// Get a file metadata.
-	GetFileMeta(ctx context.Context, userUUID, fileUUID string) (models.FileMetadata, error)
+	// Get a file.
+	GetFile(ctx context.Context, userUUID, fileUUID string) (models.File, error)
 
 	// Get a file payload. Used for downloading file content. Remember to close the reader to prevent leak.
 	DownloadFile(ctx context.Context, userUUID, fileUUID string) (models.FilePayload, error)
@@ -38,7 +38,7 @@ type LocalFManServiceHandler interface {
 	DownloadFileBatch(ctx context.Context, userUUID string, fileUUIDs []string) (models.TmpFilePayload, error)
 
 	// Search all files/directories based on given filename within a specific path.
-	SearchByName(ctx context.Context, userUUID, filename, parentDirUUID string) ([]models.FileMetadata, []models.DirectoryMetadata, error)
+	SearchByName(ctx context.Context, userUUID, filename, parentDirUUID string) ([]models.File, []models.Directory, error)
 
 	// Soft remove a file.
 	SoftRemoveFile(ctx context.Context, userUUID, fileUUID string) error
@@ -50,7 +50,7 @@ type LocalFManServiceHandler interface {
 	CreateNewDirectory(ctx context.Context, userUUID, dirname, parentDirUUID string) (string, error)
 
 	// Get a directory metadata.
-	GetDirectoryMeta(ctx context.Context, userUUID, dirUUID string) (models.DirectoryMetadata, error)
+	GetDirectoryMeta(ctx context.Context, userUUID, dirUUID string) (models.Directory, error)
 
 	// Copy a directory/folder to a new location.
 	CopyDirectory(ctx context.Context, userUUID, dirUUID, dstParentDirUUID string) (string, error)

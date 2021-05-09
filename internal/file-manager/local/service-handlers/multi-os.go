@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"github.com/nvthongswansea/xtreme/internal/database"
 	"io"
 	"io/ioutil"
 	"path/filepath"
+	"time"
 
-	"github.com/nvthongswansea/xtreme/internal/file-manager/local"
 	"github.com/nvthongswansea/xtreme/internal/models"
 	fileUtils "github.com/nvthongswansea/xtreme/pkg/file-utils"
 	uuidUtils "github.com/nvthongswansea/xtreme/pkg/uuid-utils"
@@ -16,40 +17,129 @@ import (
 )
 
 const (
-	MissingFileNameErrorMessage      = "Missing filename"
-	MissingPathErrorMessage          = "Missing path"
-	MissingDirNameErrorMessage       = "Missing directory name"
-	MissingFileUUIDErrorMessage      = "Missing file UUID"
-	MissingParentDirUUIDErrorMessage = "Missing parent directory UUID"
-
+	InvalidDirNameErrorMessage       = "directory name is invalid"
+	InvalidFileNameErrorMessage      = "filename is invalid"
 	InvalidUserUUIDErrorMessage      = "user UUID is not valid"
 	InvalidParentDirUUIDErrorMessage = "parent directory UUID is not valid"
 	InvalidFileUUIDErrorMessage      = "file UUID is not valid"
 	InvalidPathErrorMessage          = "path is not valid"
 
-	NameAlreadyExistErrorMessage = "Name already exists in desired location"
+	NameAlreadyExistErrorMessage = "name already exists in desired location"
 
-	InternalErrorMessage = "Internal error"
+	InternalErrorMessage = "internal error"
 )
 
 // MultiOSLocalFManServiceHandler implements interface LocalFManServiceHandler.
 // This implementation of LocalFManServiceHandler support multiple Operating Systems.
 type MultiOSLocalFManServiceHandler struct {
-	locaFManDBRepo local.LocalFManDBRepo
-	uuidTool       uuidUtils.UUIDGenerateValidator
-	fileOps        fileUtils.FileSaveReadRemover
-	fileCompress   fileUtils.FileCompressor
+	localFManDBRepo  database.LocalFManRepository
+	uuidTool         uuidUtils.UUIDGenerateValidator
+	fileOps          fileUtils.FileSaveReadRemover
+	fileCompress     fileUtils.FileCompressor
+	validateFilename fileUtils.FilenameValidator
 }
 
 // MultiOSLocalFManServiceHandler creates a new MultiOSLocalFManServiceHandler.
-func NewMultiOSLocalFManServiceHandler(locaFManDBRepo local.LocalFManDBRepo, uuidTool uuidUtils.UUIDGenerateValidator,
-	fileOps fileUtils.FileSaveReadRemover, fileCompress fileUtils.FileCompressor) *MultiOSLocalFManServiceHandler {
+func NewMultiOSLocalFManServiceHandler(localFManDBRepo database.LocalFManRepository, uuidTool uuidUtils.UUIDGenerateValidator,
+	fileOps fileUtils.FileSaveReadRemover, fileCompress fileUtils.FileCompressor, validateFilename fileUtils.FilenameValidator) *MultiOSLocalFManServiceHandler {
 	return &MultiOSLocalFManServiceHandler{
-		locaFManDBRepo,
+		localFManDBRepo,
 		uuidTool,
 		fileOps,
 		fileCompress,
+		validateFilename,
 	}
+}
+func (m *MultiOSLocalFManServiceHandler) RenameFile(ctx context.Context, userUUID, fileUUID, newFileName string) error {
+	// Init logger header
+	logger := log.WithFields(log.Fields{
+		"Loc":         "local-service_handler-multi_os",
+		"Operation":   "RenameFile",
+		"userUUID":    userUUID,
+		"fileUUID":    fileUUID,
+		"newFileName": newFileName,
+	})
+	logger.Debug("Start renaming file")
+	defer logger.Debug("Finish renaming file")
+	// Pre-validate inputs
+	if !m.uuidTool.ValidateUUID(userUUID) {
+		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
+		return errors.New(InvalidUserUUIDErrorMessage)
+	}
+	if !m.uuidTool.ValidateUUID(fileUUID) {
+		logger.Info("[-USER-]", InvalidFileUUIDErrorMessage)
+		return errors.New(InvalidFileUUIDErrorMessage)
+	}
+	if !m.validateFilename(newFileName) {
+		logger.Info("[-USER-]", InvalidFileNameErrorMessage)
+		return errors.New(InvalidFileNameErrorMessage)
+	}
+	// Get the source file metadata.
+	srcFile, err := m.localFManDBRepo.GetFileMetadata(ctx, userUUID, fileUUID)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] GetFileMetadata failed with error %s", err.Error())
+		return  errors.New(InternalErrorMessage)
+	}
+	if (srcFile == models.FileMetadata{}) {
+		logger.Infof("[-USER-] file UUID (%s) does not exist", fileUUID)
+		return errors.New(InvalidFileUUIDErrorMessage)
+	}
+	// Check if the file already exists in a current location in the db.
+	isExist, err := m.localFManDBRepo.IsNameExist(ctx, userUUID, srcFile.Filename, srcFile.ParentUUID)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] IsNameExist failed with error %s", err.Error())
+		return errors.New(InternalErrorMessage)
+	}
+	if isExist {
+		logger.Infof("[-USER-] %s already exists in the desired location", srcFile.Filename)
+		return errors.New(NameAlreadyExistErrorMessage)
+	}
+	// If the filename is changed, update the filename field.
+	if srcFile.Filename != newFileName {
+		srcFile.Filename = newFileName
+		err = m.localFManDBRepo.UpdateFileMetadata(ctx, srcFile)
+		if err != nil {
+			logger.Errorf("[-INTERNAL-] UpdateFileRecord failed with error %s", err.Error())
+			return errors.New(InternalErrorMessage)
+		}
+	}
+	return nil
+}
+
+func (m *MultiOSLocalFManServiceHandler) SoftRemoveFile(ctx context.Context, userUUID, fileUUID string) error {
+	panic("implement me")
+}
+
+func (m *MultiOSLocalFManServiceHandler) HardRemoveFile(ctx context.Context, userUUID, fileUUID string) error {
+	panic("implement me")
+}
+
+func (m *MultiOSLocalFManServiceHandler) GetDirectoryMeta(ctx context.Context, userUUID, dirUUID string) (models.Directory, error) {
+	panic("implement me")
+}
+
+func (m *MultiOSLocalFManServiceHandler) CopyDirectory(ctx context.Context, userUUID, dirUUID, dstParentDirUUID string) (string, error) {
+	panic("implement me")
+}
+
+func (m *MultiOSLocalFManServiceHandler) RenameDirectory(ctx context.Context, userUUID, dirUUID, newDirName string) error {
+	panic("implement me")
+}
+
+func (m *MultiOSLocalFManServiceHandler) MoveDirectory(ctx context.Context, userUUID, dirUUID, dstParentDirUUID string) (string, error) {
+	panic("implement me")
+}
+
+func (m *MultiOSLocalFManServiceHandler) DownloadDirectory(ctx context.Context, userUUID, dirUUID string) (models.TmpFilePayload, error) {
+	panic("implement me")
+}
+
+func (m *MultiOSLocalFManServiceHandler) SoftRemoveDir(ctx context.Context, userUUID, dirUUID string) error {
+	panic("implement me")
+}
+
+func (m *MultiOSLocalFManServiceHandler) HardRemoveDir(ctx context.Context, userUUID, dirUUID string) error {
+	panic("implement me")
 }
 
 func (m *MultiOSLocalFManServiceHandler) GetUUIDByPath(ctx context.Context, userUUID, path string) (string, error) {
@@ -63,15 +153,15 @@ func (m *MultiOSLocalFManServiceHandler) GetUUIDByPath(ctx context.Context, user
 	logger.Debug("Start retrieving UUID via path")
 	defer logger.Debug("Finish retrieving UUID via path")
 	// Pre-validate inputs
-	if path == "" {
-		logger.Info("[-USER-]", MissingPathErrorMessage)
-		return "", errors.New(MissingPathErrorMessage)
-	}
 	if !m.uuidTool.ValidateUUID(userUUID) {
 		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
 		return "", errors.New(InvalidUserUUIDErrorMessage)
 	}
-	uuid, err := m.locaFManDBRepo.GetUUIDByPath(ctx, userUUID, path)
+	if path == "" {
+		logger.Info("[-USER-]", InvalidPathErrorMessage)
+		return "", errors.New(InvalidPathErrorMessage)
+	}
+	uuid, err := m.localFManDBRepo.GetUUIDByPath(ctx, userUUID, path)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetUUIDByPath failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
@@ -97,7 +187,7 @@ func (m *MultiOSLocalFManServiceHandler) CreateNewFile(ctx context.Context, user
 	defer logger.Debug("Finish creating a new file")
 	emptyBytes := make([]byte, 0) // Create an empty byte slice
 	// Create a new ReadCloser
-	contentReadCloser := ioutil.NopCloser((bytes.NewReader(emptyBytes)))
+	contentReadCloser := ioutil.NopCloser(bytes.NewReader(emptyBytes))
 	return m.UploadFile(ctx, userUUID, filename, parentDirUUID, contentReadCloser)
 }
 
@@ -114,22 +204,22 @@ func (m *MultiOSLocalFManServiceHandler) UploadFile(ctx context.Context, userUUI
 	logger.Debug("Start uploading file")
 	defer logger.Debug("Finish uploading file")
 	// Pre-validate inputs
-	if filename == "" {
-		logger.Info("[-USER-]", MissingFileNameErrorMessage)
-		return "", errors.New(MissingFileNameErrorMessage)
+	if !m.uuidTool.ValidateUUID(userUUID) {
+		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
+		return "", errors.New(InvalidUserUUIDErrorMessage)
+	}
+	if !m.validateFilename(filename) {
+		logger.Info("[-USER-]", InvalidFileNameErrorMessage)
+		return "", errors.New(InvalidFileNameErrorMessage)
 	}
 	if !m.uuidTool.ValidateUUID(parentDirUUID) {
 		logger.Info("[-USER-]", InvalidParentDirUUIDErrorMessage)
 		return "", errors.New(InvalidParentDirUUIDErrorMessage)
 	}
-	if !m.uuidTool.ValidateUUID(userUUID) {
-		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
-		return "", errors.New(InvalidUserUUIDErrorMessage)
-	}
 	// Validate parent UUID.
-	isParentDirExist, err := m.locaFManDBRepo.IsParentDirExist(ctx, userUUID, parentDirUUID)
+	isParentDirExist, err := m.localFManDBRepo.IsDirExist(ctx, userUUID, parentDirUUID)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] IsParentUUIDExist failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] IsDirExist failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
 	}
 	if !isParentDirExist {
@@ -137,7 +227,7 @@ func (m *MultiOSLocalFManServiceHandler) UploadFile(ctx context.Context, userUUI
 		return "", errors.New(InvalidParentDirUUIDErrorMessage)
 	}
 	// Check if the file already exists in a desired location in the db.
-	isFilenameExist, err := m.locaFManDBRepo.IsNameExist(ctx, userUUID, filename, parentDirUUID)
+	isFilenameExist, err := m.localFManDBRepo.IsNameExist(ctx, userUUID, filename, parentDirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsNameExist failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
@@ -156,12 +246,20 @@ func (m *MultiOSLocalFManServiceHandler) UploadFile(ctx context.Context, userUUI
 		logger.Errorf("[-INTERNAL-] SaveCloseFile failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
 	}
-	// Insert new file record to the DB.
-	if err := m.locaFManDBRepo.InsertFileRecord(ctx, userUUID, newFileUUID, filename, parentDirUUID, realAbsPath, size); err != nil {
+	newFileMetadata := models.FileMetadata{
+		UUID:          newFileUUID,
+		Filename:      filename,
+		AbsPathOnDisk: realAbsPath,
+		ParentUUID:    parentDirUUID,
+		Size:          size,
+		OwnerUUID:     userUUID,
+	}
+	// Insert new file metadata to the DB.
+	if err := m.localFManDBRepo.InsertFileMetadata(ctx, newFileMetadata); err != nil {
 		// If error presents while inserting a new record,
 		// remove the file from the storage.
 		defer func() {
-			logger.Debugf("Removing file %s due to InsertFileRecord error %s", newFileUUID, err.Error())
+			logger.Debugf("Removing file %s due to InsertFileMetadata error %s", newFileUUID, err.Error())
 			err = m.fileOps.RemoveFile(newFileUUID)
 			if err != nil {
 				logger.Errorf("[-INTERNAL-] RemoveFile failed with error %s", err.Error())
@@ -197,27 +295,27 @@ func (m *MultiOSLocalFManServiceHandler) CopyFile(ctx context.Context, userUUID,
 		return "", errors.New(InvalidParentDirUUIDErrorMessage)
 	}
 	// Validate dst parent UUID.
-	isParentDirExist, err := m.locaFManDBRepo.IsParentDirExist(ctx, userUUID, dstParentDirUUID)
+	isParentDirExist, err := m.localFManDBRepo.IsDirExist(ctx, userUUID, dstParentDirUUID)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] IsParentDirExist failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] IsDirExist failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
 	}
 	if !isParentDirExist {
 		logger.Infof("[-USER-] parent directory UUID (%s) does not exist", dstParentDirUUID)
 		return "", errors.New(InvalidParentDirUUIDErrorMessage)
 	}
-	// Get the source file record.
-	srcFile, err := m.locaFManDBRepo.GetFileRecord(ctx, userUUID, fileUUID)
+	// Get the source file metadata.
+	srcFile, err := m.localFManDBRepo.GetFileMetadata(ctx, userUUID, fileUUID)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] GetFileRecord failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] GetFileMetadata failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
 	}
 	if (srcFile == models.FileMetadata{}) {
-		logger.Infof("[-USER-] file UUID (%s) does not exist", dstParentDirUUID)
+		logger.Infof("[-USER-] file UUID (%s) does not exist", fileUUID)
 		return "", errors.New(InvalidFileUUIDErrorMessage)
 	}
 	// Check if the file already exists in a desired location in the db.
-	isExist, err := m.locaFManDBRepo.IsNameExist(ctx, userUUID, srcFile.Filename, dstParentDirUUID)
+	isExist, err := m.localFManDBRepo.IsNameExist(ctx, userUUID, srcFile.Filename, dstParentDirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsNameExist failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
@@ -227,7 +325,7 @@ func (m *MultiOSLocalFManServiceHandler) CopyFile(ctx context.Context, userUUID,
 		return "", errors.New(NameAlreadyExistErrorMessage)
 	}
 	// Get source file pointer to read its content.
-	srcFReadCloser, err := m.fileOps.ReadFile(srcFile.RealPath)
+	srcFReadCloser, err := m.fileOps.ReadFile(srcFile.AbsPathOnDisk)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] ReadFile failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
@@ -243,12 +341,20 @@ func (m *MultiOSLocalFManServiceHandler) CopyFile(ctx context.Context, userUUID,
 		logger.Errorf("[-INTERNAL-] SaveCloseFile failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
 	}
-	// Insert a new file record to the DB.
-	if err = m.locaFManDBRepo.InsertFileRecord(ctx, userUUID, newFileUUID, srcFile.Filename, dstParentDirUUID, realPath, size); err != nil {
+	newFileMetadata := models.FileMetadata{
+		UUID:          newFileUUID,
+		Filename:      srcFile.Filename,
+		AbsPathOnDisk: realPath,
+		ParentUUID:    dstParentDirUUID,
+		Size:          size,
+		OwnerUUID:     userUUID,
+	}
+	// Insert a new file metadata to the DB.
+	if err = m.localFManDBRepo.InsertFileMetadata(ctx, newFileMetadata); err != nil {
 		// If error presents while inserting a new record,
 		// remove the file from the storage.
 		defer func() {
-			logger.Debugf("Removing file %s due to InsertFileRecord error %s", newFileUUID, err.Error())
+			logger.Debugf("Removing file %s due to InsertFileMetadata error %s", newFileUUID, err.Error())
 			err = m.fileOps.RemoveFile(newFileUUID)
 			if err != nil {
 				logger.Errorf("[-INTERNAL-] RemoveFile failed with error %s", err.Error())
@@ -284,19 +390,19 @@ func (m *MultiOSLocalFManServiceHandler) MoveFile(ctx context.Context, userUUID,
 		return "", errors.New(InvalidParentDirUUIDErrorMessage)
 	}
 	// Validate dst parent UUID.
-	isParentDirExist, err := m.locaFManDBRepo.IsParentDirExist(ctx, userUUID, dstParentDirUUID)
+	isParentDirExist, err := m.localFManDBRepo.IsDirExist(ctx, userUUID, dstParentDirUUID)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] IsParentDirExist failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] IsDirExist failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
 	}
 	if !isParentDirExist {
 		logger.Infof("[-USER-] parent directory UUID (%s) does not exist", dstParentDirUUID)
 		return "", errors.New(InvalidParentDirUUIDErrorMessage)
 	}
-	// Get the file record.
-	srcFile, err := m.locaFManDBRepo.GetFileRecord(ctx, userUUID, fileUUID)
+	// Get the file metadata.
+	srcFile, err := m.localFManDBRepo.GetFileMetadata(ctx, userUUID, fileUUID)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] GetFileRecord failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] GetFileMetadata failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
 	}
 	if (srcFile == models.FileMetadata{}) {
@@ -304,7 +410,7 @@ func (m *MultiOSLocalFManServiceHandler) MoveFile(ctx context.Context, userUUID,
 		return "", errors.New(InvalidFileUUIDErrorMessage)
 	}
 	// Check if the file already exists in a desired location in the db.
-	isExist, err := m.locaFManDBRepo.IsNameExist(ctx, userUUID, srcFile.Filename, dstParentDirUUID)
+	isExist, err := m.localFManDBRepo.IsNameExist(ctx, userUUID, srcFile.Filename, dstParentDirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsNameExist failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
@@ -315,19 +421,20 @@ func (m *MultiOSLocalFManServiceHandler) MoveFile(ctx context.Context, userUUID,
 	}
 	// If the parentDirUUID is changed, update the parent UUID.
 	if srcFile.ParentUUID != dstParentDirUUID {
-		err = m.locaFManDBRepo.UpdateFileRecord(ctx, userUUID, srcFile.Filename, dstParentDirUUID)
+		srcFile.ParentUUID = dstParentDirUUID
+		err = m.localFManDBRepo.UpdateFileMetadata(ctx, srcFile)
 		if err != nil {
-			logger.Errorf("[-INTERNAL-] InsertFileRecord failed with error %s", err.Error())
+			logger.Errorf("[-INTERNAL-] UpdateFileMetadata failed with error %s", err.Error())
 			return "", errors.New(InternalErrorMessage)
 		}
 	}
 	return fileUUID, nil
 }
 
-func (m *MultiOSLocalFManServiceHandler) GetFileMeta(ctx context.Context, userUUID, fileUUID string) (models.FileMetadata, error) {
+func (m *MultiOSLocalFManServiceHandler) GetFile(ctx context.Context, userUUID, fileUUID string) (models.File, error) {
 	logger := log.WithFields(log.Fields{
 		"Loc":       "local-service_handler-multi_os",
-		"Operation": "GetFileMeta",
+		"Operation": "GetFile",
 		"userUUID":  userUUID,
 		"fileUUID":  fileUUID,
 	})
@@ -336,21 +443,21 @@ func (m *MultiOSLocalFManServiceHandler) GetFileMeta(ctx context.Context, userUU
 	// Pre-validate inputs
 	if !m.uuidTool.ValidateUUID(userUUID) {
 		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
-		return models.FileMetadata{}, errors.New(InvalidUserUUIDErrorMessage)
+		return models.File{}, errors.New(InvalidUserUUIDErrorMessage)
 	}
 	if !m.uuidTool.ValidateUUID(fileUUID) {
 		logger.Info("[-USER-]", InvalidFileUUIDErrorMessage)
-		return models.FileMetadata{}, errors.New(InvalidFileUUIDErrorMessage)
+		return models.File{}, errors.New(InvalidFileUUIDErrorMessage)
 	}
-	// Get the file record.
-	srcFile, err := m.locaFManDBRepo.GetFileRecord(ctx, userUUID, fileUUID)
+	// Get the file metadata.
+	srcFile, err := m.localFManDBRepo.GetFile(ctx, userUUID, fileUUID)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] GetFileRecord failed with error %s", err.Error())
-		return models.FileMetadata{}, errors.New(InternalErrorMessage)
+		logger.Errorf("[-INTERNAL-] GetFile failed with error %s", err.Error())
+		return models.File{}, errors.New(InternalErrorMessage)
 	}
-	if (srcFile == models.FileMetadata{}) {
+	if (srcFile == models.File{}) {
 		logger.Infof("[-USER-] file UUID (%s) does not exist", fileUUID)
-		return models.FileMetadata{}, errors.New(InvalidFileUUIDErrorMessage)
+		return models.File{}, errors.New(InvalidFileUUIDErrorMessage)
 	}
 	return srcFile, nil
 }
@@ -373,24 +480,24 @@ func (m *MultiOSLocalFManServiceHandler) DownloadFile(ctx context.Context, userU
 		logger.Info("[-USER-]", InvalidFileUUIDErrorMessage)
 		return models.FilePayload{}, errors.New(InvalidFileUUIDErrorMessage)
 	}
-	// Get the file record.
-	srcFile, err := m.locaFManDBRepo.GetFileRecord(ctx, userUUID, fileUUID)
+	// Get the file metadata.
+	srcFile, err := m.localFManDBRepo.GetFileMetadata(ctx, userUUID, fileUUID)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] GetFileRecord failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] GetFileMetadata failed with error %s", err.Error())
 		return models.FilePayload{}, errors.New(InternalErrorMessage)
 	}
 	if (srcFile == models.FileMetadata{}) {
 		logger.Infof("[-USER-] file UUID (%s) does not exist", fileUUID)
 		return models.FilePayload{}, errors.New(InvalidFileUUIDErrorMessage)
 	}
-	fileRCloser, err := m.fileOps.ReadFile(srcFile.RealPath)
+	fileRCloser, err := m.fileOps.ReadFile(srcFile.AbsPathOnDisk)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] ReadFile failed with error %s", err.Error())
 		return models.FilePayload{}, errors.New(InternalErrorMessage)
 	}
 	payload := models.FilePayload{
 		Filename:      srcFile.Filename,
-		ContentLength: srcFile.FileSize,
+		ContentLength: srcFile.Size,
 		ReadCloser:    fileRCloser,
 	}
 	return payload, nil
@@ -416,10 +523,10 @@ func (m *MultiOSLocalFManServiceHandler) DownloadFileBatch(ctx context.Context, 
 			return models.TmpFilePayload{}, errors.New(InvalidFileUUIDErrorMessage)
 		}
 	}
-	// Get the file records.
-	srcFiles, err := m.locaFManDBRepo.GetFileRecordBatch(ctx, userUUID, fileUUIDs)
+	// Get the files' metadata.
+	srcFiles, err := m.localFManDBRepo.GetFileMetadataBatch(ctx, userUUID, fileUUIDs)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] GetFileRecord failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] GetFileMetadataBatch failed with error %s", err.Error())
 		return models.TmpFilePayload{}, errors.New(InternalErrorMessage)
 	}
 	if len(srcFiles) == 0 {
@@ -428,7 +535,7 @@ func (m *MultiOSLocalFManServiceHandler) DownloadFileBatch(ctx context.Context, 
 	}
 	inZipPaths := make(map[string]string)
 	for _, srcFile := range srcFiles {
-		inZipPaths[srcFile.Filename] = srcFile.RealPath
+		inZipPaths[srcFile.Filename] = srcFile.AbsPathOnDisk
 	}
 	tmpFile, err := m.fileCompress.CompressFiles(inZipPaths)
 	if err != nil {
@@ -449,7 +556,7 @@ func (m *MultiOSLocalFManServiceHandler) DownloadFileBatch(ctx context.Context, 
 	return payload, nil
 }
 
-func (m *MultiOSLocalFManServiceHandler) SearchByName(ctx context.Context, userUUID, filename, parentDirUUID string) ([]models.FileMetadata, []models.DirectoryMetadata, error) {
+func (m *MultiOSLocalFManServiceHandler) SearchByName(ctx context.Context, userUUID, filename, parentDirUUID string) ([]models.File, []models.Directory, error) {
 	// Init logger header
 	logger := log.WithFields(log.Fields{
 		"Loc":           "local-service_handler-multi_os",
@@ -464,21 +571,25 @@ func (m *MultiOSLocalFManServiceHandler) SearchByName(ctx context.Context, userU
 		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
 		return nil, nil, errors.New(InvalidUserUUIDErrorMessage)
 	}
+	if !m.validateFilename(filename) {
+		logger.Info("[-USER-]", InvalidFileNameErrorMessage)
+		return nil, nil, errors.New(InvalidFileNameErrorMessage)
+	}
 	if !m.uuidTool.ValidateUUID(parentDirUUID) {
 		logger.Info("[-USER-]", InvalidParentDirUUIDErrorMessage)
 		return nil, nil, errors.New(InvalidParentDirUUIDErrorMessage)
 	}
 	// Validate parent UUID.
-	isParentDirExist, err := m.locaFManDBRepo.IsParentDirExist(ctx, userUUID, parentDirUUID)
+	isParentDirExist, err := m.localFManDBRepo.IsDirExist(ctx, userUUID, parentDirUUID)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] IsParentUUIDExist failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] IsDirExist failed with error %s", err.Error())
 		return nil, nil, errors.New(InternalErrorMessage)
 	}
 	if !isParentDirExist {
 		logger.Infof("[-USER-] parent directory UUID (%s) does not exist", parentDirUUID)
 		return nil, nil, errors.New(InvalidParentDirUUIDErrorMessage)
 	}
-	files, dirs, err := m.locaFManDBRepo.SearchByName(ctx, userUUID, filename, parentDirUUID)
+	files, dirs, err := m.localFManDBRepo.SearchByName(ctx, userUUID, filename, parentDirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetUUIDByPath failed with error %s", err.Error())
 		return nil, nil, errors.New(InternalErrorMessage)
@@ -497,22 +608,22 @@ func (m *MultiOSLocalFManServiceHandler) CreateNewDirectory(ctx context.Context,
 	logger.Debug("Start creating a new directory")
 	defer logger.Debug("Finish creating a new directory")
 	// Pre-validate inputs
-	if dirname == "" {
-		logger.Info("[-USER-]", MissingDirNameErrorMessage)
-		return "", errors.New(MissingDirNameErrorMessage)
-	}
-	if parentDirUUID == "" {
-		logger.Info("[-USER-]", MissingParentDirUUIDErrorMessage)
-		return "", errors.New(MissingParentDirUUIDErrorMessage)
-	}
 	if !m.uuidTool.ValidateUUID(userUUID) {
 		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
 		return "", errors.New(InvalidUserUUIDErrorMessage)
 	}
+	if !m.validateFilename(dirname) {
+		logger.Info("[-USER-]", InvalidDirNameErrorMessage)
+		return "", errors.New(InvalidDirNameErrorMessage)
+	}
+	if m.uuidTool.ValidateUUID(parentDirUUID) {
+		logger.Info("[-USER-]", InvalidDirNameErrorMessage)
+		return "", errors.New(InvalidDirNameErrorMessage)
+	}
 	// Validate parent UUID.
-	isParentDirExist, err := m.locaFManDBRepo.IsParentDirExist(ctx, userUUID, parentDirUUID)
+	isParentDirExist, err := m.localFManDBRepo.IsDirExist(ctx, userUUID, parentDirUUID)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] IsParentUUIDExist failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] IsDirExist failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
 	}
 	if !isParentDirExist {
@@ -520,7 +631,7 @@ func (m *MultiOSLocalFManServiceHandler) CreateNewDirectory(ctx context.Context,
 		return "", errors.New(InvalidParentDirUUIDErrorMessage)
 	}
 	// Check if the directory already exists in a desired location in the db.
-	isExist, err := m.locaFManDBRepo.IsNameExist(ctx, userUUID, dirname, parentDirUUID)
+	isExist, err := m.localFManDBRepo.IsNameExist(ctx, userUUID, dirname, parentDirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsNameExist failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
@@ -533,7 +644,13 @@ func (m *MultiOSLocalFManServiceHandler) CreateNewDirectory(ctx context.Context,
 	newDirUUID := m.uuidTool.NewUUID()
 	logger = logger.WithField("newDirUUID", newDirUUID)
 	// Insert new file record to the DB.
-	err = m.locaFManDBRepo.InsertDirRecord(ctx, userUUID, newDirUUID, dirname, parentDirUUID)
+	newDirMetadata := models.DirectoryMetadata{
+		UUID:       newDirUUID,
+		Dirname:    dirname,
+		ParentUUID: parentDirUUID,
+		OwnerUUID:  userUUID,
+	}
+	err = m.localFManDBRepo.InsertDirectoryMetadata(ctx, newDirMetadata)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] InsertDirRecord failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)

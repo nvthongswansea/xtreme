@@ -5,7 +5,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
+
+const filenameInvalidChars string = "\\/.?%*:|\"<>,;= "
 
 // FileSaveReadRemover provides an interface to save/read/remove a file to/from/from a source.
 type FileSaveReadRemover interface {
@@ -64,4 +67,17 @@ func (fs *LocalFileOperator) ReadFile(absFilePathOD string) (io.ReadCloser, erro
 // RemoveFile removes a file from the local disk.
 func (fs *LocalFileOperator) RemoveFile(absFilePathOD string) error {
 	return os.Remove(absFilePathOD)
+}
+
+// FilenameValidator is signature of a func to validate the filename.
+type FilenameValidator func(filename string) bool
+
+// IsFilenameOk checks if filename is valid. If the filename doesn't
+// contain any prohibited characters, return true; otherwise
+// return false
+func IsFilenameOk(filename string) bool {
+	if filename == "" || strings.ContainsAny(filename, filenameInvalidChars) {
+		return false
+	}
+	return true
 }

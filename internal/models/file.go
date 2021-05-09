@@ -6,58 +6,52 @@ import (
 	"time"
 )
 
+// File holds metadata and description of a file.
+type File struct {
+	Metadata FileMetadata`json:"metadata"`
+	Description FileDescription `json:"description"`
+}
+
 // FileMetadata holds metadata of a File.
 type FileMetadata struct {
 	// UUID of the file.
-	UUID string
+	UUID string `json:"uuid"`
 
 	// Name of the file.
-	Filename string
+	Filename string `json:"filename"`
+
+	// MIME type.
+	MIMEType string `json:"mime_type"`
 
 	// Human-readable path of the file.
-	Path string
+	Path string `json:"path"`
 
-	// Real path of the file, where it is logically stored in the disk.
-	RealPath string
+	// Real absolute path of the file, where it is logically stored.
+	AbsPathOnDisk string `json:"-"`
 
 	// Parent directory UUID.
-	ParentUUID string
+	ParentUUID string `json:"parent_uuid"`
 
 	// Size of the file.
-	FileSize int64
+	Size int64 `json:"size"`
+
+	// File owner's userUUID.
+	OwnerUUID string `json:"owner_uuid"`
 
 	// Time when the file is created.
-	CreatedAt time.Time
+	CreatedAt time.Time `json:"created_at"`
 
 	// Time of the last file update.
-	UpdatedAt time.Time
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// DirectoryMetadata holds metadata of a directory/folder.
-type DirectoryMetadata struct {
-	// UUID of the directory.
-	UUID string
+// FileDescription describes the file in short form.
+type FileDescription struct {
+	// Description in text form.
+	DescriptionText string `json:"text"`
 
-	// Name of the directory.
-	Dirname string
-
-	// Human-readable path of the directory.
-	Path string
-
-	// Parent directory UUID.
-	ParentUUID string
-
-	// Time when the directory is created.
-	CreatedAt time.Time
-
-	// Time of the last directory update.
-	UpdatedAt time.Time
-
-	// A list of child-files.
-	ListOfFiles []FileMetadata
-
-	// A list of child-dirs.
-	ListOfDirs []DirectoryMetadata
+	// Thumbnail image of the file (base64).
+	ThumbnailBase64 string `json:"thumbnail_base_64"`
 }
 
 // FilePayload holds content reader of a file.
