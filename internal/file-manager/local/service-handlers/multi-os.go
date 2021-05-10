@@ -173,10 +173,10 @@ func (m *MultiOSLocalFManServiceHandler) HardRemoveFile(ctx context.Context, use
 func (m *MultiOSLocalFManServiceHandler) GetDirectory(ctx context.Context, userUUID, dirUUID string) (models.Directory, error) {
 	// Init logger header
 	logger := log.WithFields(log.Fields{
-		"Loc":        "local-service_handler-multi_os",
-		"Operation":  "GetDirectory",
-		"userUUID":   userUUID,
-		"dirUUID":    dirUUID,
+		"Loc":       "local-service_handler-multi_os",
+		"Operation": "GetDirectory",
+		"userUUID":  userUUID,
+		"dirUUID":   dirUUID,
 	})
 	logger.Debug("Start getting directory")
 	defer logger.Debug("Finish getting directory")
@@ -261,7 +261,7 @@ func (m *MultiOSLocalFManServiceHandler) MoveDirectory(ctx context.Context, user
 		"Loc":              "local-service_handler-multi_os",
 		"Operation":        "MoveDirectory",
 		"userUUID":         userUUID,
-		"dirUUID":         dirUUID,
+		"dirUUID":          dirUUID,
 		"dstParentDirUUID": dstParentDirUUID,
 	})
 	logger.Debug("Start moving directory")
