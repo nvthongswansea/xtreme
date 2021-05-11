@@ -1,9 +1,10 @@
-package svhander
+package local
 
 import (
 	"bytes"
 	"context"
 	"errors"
+	"github.com/nvthongswansea/xtreme/internal/author"
 	"github.com/nvthongswansea/xtreme/internal/database"
 	"github.com/nvthongswansea/xtreme/internal/models"
 	fileUtils "github.com/nvthongswansea/xtreme/pkg/file-utils"
@@ -23,8 +24,9 @@ const (
 	InvalidDirUUIDErrorMessage       = "file UUID is not valid"
 	InvalidPathErrorMessage          = "path is not valid"
 
+	PathNotFoundMessage = "path not found"
 	NameAlreadyExistErrorMessage            = "name already exists in desired location"
-	ForbiddenOperationOnRootDirErrorMessage = "forbidden operations on root directory"
+	ForbiddenOperationErrorMessage = "forbidden operation"
 
 	InternalErrorMessage = "internal error"
 )
@@ -36,16 +38,41 @@ type MultiOSLocalFManServiceHandler struct {
 	uuidTool        uuidUtils.UUIDGenerateValidator
 	fileOps         fileUtils.FileSaveReadRemover
 	fileCompress    fileUtils.FileCompressor
+	author author.Authorizer
+}
+
+func (m *MultiOSLocalFManServiceHandler) GetRootDirectory(ctx context.Context, userUUID string) (models.Directory, error) {
+	// Init logger header
+	logger := log.WithFields(log.Fields{
+		"Loc":         "local-service_handler-multi_os",
+		"Operation":   "GetRootDirectory",
+		"userUUID":    userUUID,
+	})
+	logger.Debug("Start retrieving root directory")
+	defer logger.Debug("Finish retrieving root directory")
+	// Pre-validate inputs
+	if !m.uuidTool.ValidateUUID(userUUID) {
+		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
+		return models.Directory{}, errors.New(InvalidUserUUIDErrorMessage)
+	}
+	// No need to authorize.
+	rooDir, err := m.localFManDBRepo.GetRootDirectory(ctx, userUUID)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] GetRootDirectory failed with error %s", err.Error())
+		return models.Directory{}, err
+	}
+	return rooDir, nil
 }
 
 // NewMultiOSLocalFManServiceHandler creates a new MultiOSLocalFManServiceHandler.
 func NewMultiOSLocalFManServiceHandler(localFManDBRepo database.LocalFManRepository, uuidTool uuidUtils.UUIDGenerateValidator,
-	fileOps fileUtils.FileSaveReadRemover, fileCompress fileUtils.FileCompressor) *MultiOSLocalFManServiceHandler {
+	fileOps fileUtils.FileSaveReadRemover, fileCompress fileUtils.FileCompressor, author author.Authorizer) *MultiOSLocalFManServiceHandler {
 	return &MultiOSLocalFManServiceHandler{
 		localFManDBRepo,
 		uuidTool,
 		fileOps,
 		fileCompress,
+		author,
 	}
 }
 func (m *MultiOSLocalFManServiceHandler) RenameFile(ctx context.Context, userUUID, fileUUID, newFileName string) error {
@@ -60,6 +87,10 @@ func (m *MultiOSLocalFManServiceHandler) RenameFile(ctx context.Context, userUUI
 	logger.Debug("Start renaming file")
 	defer logger.Debug("Finish renaming file")
 	// Pre-validate inputs
+	if !m.uuidTool.ValidateUUID(userUUID) {
+		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
+		return errors.New(InvalidUserUUIDErrorMessage)
+	}
 	if !m.uuidTool.ValidateUUID(fileUUID) {
 		logger.Info("[-USER-]", InvalidFileUUIDErrorMessage)
 		return errors.New(InvalidFileUUIDErrorMessage)
@@ -68,18 +99,25 @@ func (m *MultiOSLocalFManServiceHandler) RenameFile(ctx context.Context, userUUI
 		logger.Info("[-USER-]", InvalidFileNameErrorMessage)
 		return errors.New(InvalidFileNameErrorMessage)
 	}
+	// Authorization.
+	isAuthorized, err := m.author.AuthorizeActionsOnFile(ctx, userUUID, fileUUID, author.UpdateFileAction)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnFile failed with error %s", err.Error())
+		return errors.New(InternalErrorMessage)
+	}
+	if !isAuthorized {
+		logger.Info(ForbiddenOperationErrorMessage)
+		return errors.New(ForbiddenOperationErrorMessage)
+	}
+
 	// Get the source file metadata.
-	srcFile, err := m.localFManDBRepo.GetFileMetadata(ctx, userUUID, fileUUID)
+	srcFile, err := m.localFManDBRepo.GetFileMetadata(ctx, fileUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetFileMetadata failed with error %s", err.Error())
 		return errors.New(InternalErrorMessage)
 	}
-	if (srcFile == models.FileMetadata{}) {
-		logger.Infof("[-USER-] file UUID (%s) does not exist", fileUUID)
-		return errors.New(InvalidFileUUIDErrorMessage)
-	}
 	// Check if the file already exists in a current location in the db.
-	isExist, err := m.localFManDBRepo.IsNameExist(ctx, userUUID, newFileName, srcFile.ParentUUID)
+	isExist, err := m.localFManDBRepo.IsNameExist(ctx, newFileName, srcFile.ParentUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsNameExist failed with error %s", err.Error())
 		return errors.New(InternalErrorMessage)
@@ -108,20 +146,26 @@ func (m *MultiOSLocalFManServiceHandler) SoftRemoveFile(ctx context.Context, use
 	logger.Debug("Start removing file (SOFT)")
 	defer logger.Debug("Finish removing file (SOFT)")
 	// Pre-validate inputs
+	if !m.uuidTool.ValidateUUID(userUUID) {
+		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
+		return errors.New(InvalidUserUUIDErrorMessage)
+	}
 	if !m.uuidTool.ValidateUUID(fileUUID) {
 		logger.Info("[-USER-]", InvalidFileUUIDErrorMessage)
 		return errors.New(InvalidFileUUIDErrorMessage)
 	}
-	isFileExist, err := m.localFManDBRepo.IsFileExist(ctx, userUUID, fileUUID)
+	// Authorization.
+	isAuthorized, err := m.author.AuthorizeActionsOnFile(ctx, userUUID, fileUUID, author.RemoveFileAction)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] IsFileExist failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnFile failed with error %s", err.Error())
 		return errors.New(InternalErrorMessage)
 	}
-	if !isFileExist {
-		logger.Info("[-USER-]", InvalidFileUUIDErrorMessage)
-		return errors.New(InvalidFileUUIDErrorMessage)
+	if !isAuthorized {
+		logger.Info(ForbiddenOperationErrorMessage)
+		return errors.New(ForbiddenOperationErrorMessage)
 	}
-	err = m.localFManDBRepo.SoftRemoveFile(ctx, userUUID, fileUUID)
+
+	err = m.localFManDBRepo.SoftRemoveFile(ctx, fileUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] SoftRemoveFile failed with error %s", err.Error())
 		return errors.New(InternalErrorMessage)
@@ -139,30 +183,26 @@ func (m *MultiOSLocalFManServiceHandler) HardRemoveFile(ctx context.Context, use
 	})
 	logger.Debug("Start removing file (HARD)")
 	defer logger.Debug("Finish removing file (HARD)")
-	// Pre-validate inputs
+	if !m.uuidTool.ValidateUUID(userUUID) {
+		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
+		return errors.New(InvalidUserUUIDErrorMessage)
+	}
 	if !m.uuidTool.ValidateUUID(fileUUID) {
 		logger.Info("[-USER-]", InvalidFileUUIDErrorMessage)
 		return errors.New(InvalidFileUUIDErrorMessage)
 	}
-	isFileExist, err := m.localFManDBRepo.IsFileExist(ctx, userUUID, fileUUID)
+	// Authorization.
+	isAuthorized, err := m.author.AuthorizeActionsOnFile(ctx, userUUID, fileUUID, author.RemoveFileAction)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] IsFileExist failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnFile failed with error %s", err.Error())
 		return errors.New(InternalErrorMessage)
 	}
-	if !isFileExist {
-		logger.Info("[-USER-]", InvalidFileUUIDErrorMessage)
-		return errors.New(InvalidFileUUIDErrorMessage)
+	if !isAuthorized {
+		logger.Info(ForbiddenOperationErrorMessage)
+		return errors.New(ForbiddenOperationErrorMessage)
 	}
-	srcFile, err := m.localFManDBRepo.GetFileMetadata(ctx, userUUID, fileUUID)
-	if err != nil {
-		logger.Errorf("[-INTERNAL-] GetFileMetadata failed with error %s", err.Error())
-		return errors.New(InternalErrorMessage)
-	}
-	if (srcFile == models.FileMetadata{}) {
-		logger.Infof("[-USER-] file UUID (%s) does not exist", fileUUID)
-		return errors.New(InvalidFileUUIDErrorMessage)
-	}
-	err = m.localFManDBRepo.HardRemoveFile(ctx, userUUID, fileUUID, m.fileOps.RemoveFile)
+
+	err = m.localFManDBRepo.HardRemoveFile(ctx, fileUUID, m.fileOps.RemoveFile)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] HardRemoveFile failed with error %s", err.Error())
 		return errors.New(InternalErrorMessage)
@@ -180,12 +220,26 @@ func (m *MultiOSLocalFManServiceHandler) GetDirectory(ctx context.Context, userU
 	})
 	logger.Debug("Start getting directory")
 	defer logger.Debug("Finish getting directory")
-	// Pre-validate inputs
+	if !m.uuidTool.ValidateUUID(userUUID) {
+		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
+		return models.Directory{}, errors.New(InvalidUserUUIDErrorMessage)
+	}
 	if !m.uuidTool.ValidateUUID(dirUUID) {
 		logger.Info("[-USER-]", InvalidDirUUIDErrorMessage)
 		return models.Directory{}, errors.New(InvalidDirUUIDErrorMessage)
 	}
-	directory, err := m.localFManDBRepo.GetDirectory(ctx, userUUID, dirUUID)
+	// Authorization.
+	isAuthorized, err := m.author.AuthorizeActionsOnDir(ctx, userUUID, dirUUID, author.ViewDirAction)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
+		return models.Directory{},errors.New(InternalErrorMessage)
+	}
+	if !isAuthorized {
+		logger.Info(ForbiddenOperationErrorMessage)
+		return models.Directory{}, errors.New(ForbiddenOperationErrorMessage)
+	}
+
+	directory, err := m.localFManDBRepo.GetDirectory(ctx, dirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetDirMetadata failed with error %s", err.Error())
 		return models.Directory{}, errors.New(InternalErrorMessage)
@@ -194,7 +248,85 @@ func (m *MultiOSLocalFManServiceHandler) GetDirectory(ctx context.Context, userU
 }
 
 func (m *MultiOSLocalFManServiceHandler) CopyDirectory(ctx context.Context, userUUID, dirUUID, dstParentDirUUID string) (string, error) {
-	panic("implement me")
+	logger := log.WithFields(log.Fields{
+		"Loc":              "local-service_handler-multi_os",
+		"Operation":        "CopyDirectory",
+		"userUUID":         userUUID,
+		"dirUUID":          dirUUID,
+		"dstParentDirUUID": dstParentDirUUID,
+	})
+	logger.Debug("Start moving directory")
+	defer logger.Debug("Finish moving directory")
+	// Pre-validate inputs
+	if !m.uuidTool.ValidateUUID(userUUID) {
+		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
+		return "", errors.New(InvalidUserUUIDErrorMessage)
+	}
+	if !m.uuidTool.ValidateUUID(dirUUID) {
+		logger.Info("[-USER-]", InvalidDirUUIDErrorMessage)
+		return "", errors.New(InvalidDirUUIDErrorMessage)
+	}
+	if !m.uuidTool.ValidateUUID(dstParentDirUUID) {
+		logger.Info("[-USER-]", InvalidDirUUIDErrorMessage)
+		return "", errors.New(InvalidDirUUIDErrorMessage)
+	}
+	// Authorization.
+	isAuthorized, err := m.author.AuthorizeActionsOnDir(ctx, userUUID, dirUUID, author.CopyDirAction)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
+		return "", errors.New(InternalErrorMessage)
+	}
+	if !isAuthorized {
+		logger.Info(ForbiddenOperationErrorMessage)
+		return "", errors.New(ForbiddenOperationErrorMessage)
+	}
+	return m.copyDirectory(ctx, logger, userUUID, dirUUID, dstParentDirUUID)
+}
+
+func (m *MultiOSLocalFManServiceHandler) copyDirectory(ctx context.Context, logger *log.Entry, userUUID, dirUUID, dstParentDirUUID string) (string, error) {
+	// Get to-be-copied dir metadata.
+	copiedDirMeta, err := m.localFManDBRepo.GetDirMetadata(ctx, dirUUID)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] GetDirMetadata failed with error %s", err.Error())
+		return "", errors.New(InternalErrorMessage)
+	}
+	logger.WithField("currentCopyPath", copiedDirMeta.Path)
+	// Copy the current dir to the new location
+	nDirCopyUUID, err := m.createNewDirectory(ctx, logger, userUUID, copiedDirMeta.Dirname, dstParentDirUUID)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] createNewDirectory failed with error %s", err.Error())
+		return "", errors.New(InternalErrorMessage)
+	}
+
+	// Copy files to the newly created directory.
+	childFileMetaList, err := m.localFManDBRepo.GetChildFileMetadataList(ctx, dirUUID)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] GetChildFileMetadataList failed with error %s", err.Error())
+		return "", errors.New(InternalErrorMessage)
+	}
+	for _, childMeta := range childFileMetaList {
+		_, err := m.copyFile(ctx, logger, userUUID, childMeta.UUID, nDirCopyUUID)
+		if err != nil {
+			logger.Errorf("[-INTERNAL-] copyFile failed with error %s", err.Error())
+			return "", errors.New(InternalErrorMessage)
+		}
+	}
+
+	// Get direct child-directories' UUIDs of the current to-be-copied dir.
+	dChildDirUUIDList, err := m.localFManDBRepo.GetDirectChildDirUUIDList(ctx, dirUUID)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] GetDirectChildDirUUIDList failed with error %s", err.Error())
+		return "", errors.New(InternalErrorMessage)
+	}
+	for _, childDirUUID := range dChildDirUUIDList {
+		// Recursively do copy the child directories with their child files/directories.
+		_, err := m.copyDirectory(ctx, logger, userUUID, childDirUUID, nDirCopyUUID)
+		if err != nil {
+			logger.Errorf("[-INTERNAL-] copyDirectory failed with error %s", err.Error())
+			return "", errors.New(InternalErrorMessage)
+		}
+	}
+	return nDirCopyUUID, nil
 }
 
 func (m *MultiOSLocalFManServiceHandler) RenameDirectory(ctx context.Context, userUUID, dirUUID, newDirName string) error {
@@ -209,6 +341,10 @@ func (m *MultiOSLocalFManServiceHandler) RenameDirectory(ctx context.Context, us
 	logger.Debug("Start renaming directory")
 	defer logger.Debug("Finish renaming directory")
 	// Pre-validate inputs
+	if !m.uuidTool.ValidateUUID(userUUID) {
+		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
+		return errors.New(InvalidUserUUIDErrorMessage)
+	}
 	if !m.uuidTool.ValidateUUID(dirUUID) {
 		logger.Info("[-USER-]", InvalidDirUUIDErrorMessage)
 		return errors.New(InvalidDirUUIDErrorMessage)
@@ -217,18 +353,19 @@ func (m *MultiOSLocalFManServiceHandler) RenameDirectory(ctx context.Context, us
 		logger.Info("[-USER-]", InvalidFileNameErrorMessage)
 		return errors.New(InvalidFileNameErrorMessage)
 	}
-	// Cannot rename root dir
-	isRootDir, err := m.localFManDBRepo.IsRootDir(ctx, userUUID, dirUUID)
+	// Authorization.
+	isAuthorized, err := m.author.AuthorizeActionsOnDir(ctx, userUUID, dirUUID, author.UpdateDirAction)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] IsRootDir failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
 		return errors.New(InternalErrorMessage)
 	}
-	if isRootDir {
-		logger.Info("[-USER-]", ForbiddenOperationOnRootDirErrorMessage)
-		return errors.New(ForbiddenOperationOnRootDirErrorMessage)
+	if !isAuthorized {
+		logger.Info(ForbiddenOperationErrorMessage)
+		return errors.New(ForbiddenOperationErrorMessage)
 	}
+
 	// Get the source directory metadata.
-	dirMeta, err := m.localFManDBRepo.GetDirMetadata(ctx, userUUID, dirUUID)
+	dirMeta, err := m.localFManDBRepo.GetDirMetadata(ctx, dirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetDirMetadata failed with error %s", err.Error())
 		return errors.New(InternalErrorMessage)
@@ -238,7 +375,7 @@ func (m *MultiOSLocalFManServiceHandler) RenameDirectory(ctx context.Context, us
 		return errors.New(InvalidDirUUIDErrorMessage)
 	}
 	// Check if the name already exists in a current location in the db.
-	isExist, err := m.localFManDBRepo.IsNameExist(ctx, userUUID, newDirName, dirMeta.ParentUUID)
+	isExist, err := m.localFManDBRepo.IsNameExist(ctx, newDirName, dirMeta.ParentUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsNameExist failed with error %s", err.Error())
 		return errors.New(InternalErrorMessage)
@@ -267,36 +404,37 @@ func (m *MultiOSLocalFManServiceHandler) MoveDirectory(ctx context.Context, user
 	logger.Debug("Start moving directory")
 	defer logger.Debug("Finish moving directory")
 	// Pre-validate inputs
+	if !m.uuidTool.ValidateUUID(userUUID) {
+		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
+		return "", errors.New(InvalidUserUUIDErrorMessage)
+	}
 	if !m.uuidTool.ValidateUUID(dirUUID) {
-		logger.Info("[-USER-]", InvalidFileUUIDErrorMessage)
-		return "", errors.New(InvalidFileUUIDErrorMessage)
+		logger.Info("[-USER-]", InvalidDirUUIDErrorMessage)
+		return "", errors.New(InvalidDirUUIDErrorMessage)
 	}
 	if !m.uuidTool.ValidateUUID(dstParentDirUUID) {
-		logger.Info("[-USER-]", InvalidParentDirUUIDErrorMessage)
-		return "", errors.New(InvalidParentDirUUIDErrorMessage)
+		logger.Info("[-USER-]", InvalidDirUUIDErrorMessage)
+		return "", errors.New(InvalidDirUUIDErrorMessage)
 	}
-	// Validate dst parent UUID.
-	isParentDirExist, err := m.localFManDBRepo.IsDirExist(ctx, userUUID, dstParentDirUUID)
+	// Authorization.
+	isAuthorized, err := m.author.AuthorizeActionsOnDir(ctx, userUUID, dirUUID, author.CopyDirAction, author.RemoveDirAction)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] IsDirExist failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
 	}
-	if !isParentDirExist {
-		logger.Infof("[-USER-] parent directory UUID (%s) does not exist", dstParentDirUUID)
-		return "", errors.New(InvalidParentDirUUIDErrorMessage)
+	if !isAuthorized {
+		logger.Info(ForbiddenOperationErrorMessage)
+		return "", errors.New(ForbiddenOperationErrorMessage)
 	}
+
 	// Get the directory metadata.
-	dirMeta, err := m.localFManDBRepo.GetDirMetadata(ctx, userUUID, dirUUID)
+	dirMeta, err := m.localFManDBRepo.GetDirMetadata(ctx, dirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetDirMetadata failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
 	}
-	if (dirMeta == models.DirectoryMetadata{}) {
-		logger.Infof("[-USER-] file UUID (%s) does not exist", dirUUID)
-		return "", errors.New(InvalidFileUUIDErrorMessage)
-	}
-	// Check if the file already exists in a desired location in the db.
-	isExist, err := m.localFManDBRepo.IsNameExist(ctx, userUUID, dirMeta.Dirname, dstParentDirUUID)
+	// Check if the directory name already exists in a desired location in the db.
+	isExist, err := m.localFManDBRepo.IsNameExist(ctx, dirMeta.Dirname, dstParentDirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsNameExist failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
@@ -315,7 +453,74 @@ func (m *MultiOSLocalFManServiceHandler) MoveDirectory(ctx context.Context, user
 }
 
 func (m *MultiOSLocalFManServiceHandler) DownloadDirectory(ctx context.Context, userUUID, dirUUID string) (models.TmpFilePayload, error) {
-	panic("implement me")
+	// Init logger header
+	logger := log.WithFields(log.Fields{
+		"Loc":       "local-service_handler-multi_os",
+		"Operation": "DownloadDirectory",
+		"userUUID":  userUUID,
+		"dirUUID":   dirUUID,
+	})
+	logger.Debug("Start getting directory")
+	defer logger.Debug("Finish getting directory")
+	if !m.uuidTool.ValidateUUID(userUUID) {
+		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
+		return models.TmpFilePayload{}, errors.New(InvalidUserUUIDErrorMessage)
+	}
+	if !m.uuidTool.ValidateUUID(dirUUID) {
+		logger.Info("[-USER-]", InvalidDirUUIDErrorMessage)
+		return models.TmpFilePayload{}, errors.New(InvalidDirUUIDErrorMessage)
+	}
+	// Authorization.
+	isAuthorized, err := m.author.AuthorizeActionsOnDir(ctx, userUUID, dirUUID, author.ViewDirAction)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
+		return models.TmpFilePayload{},errors.New(InternalErrorMessage)
+	}
+	if !isAuthorized {
+		logger.Info(ForbiddenOperationErrorMessage)
+		return models.TmpFilePayload{}, errors.New(ForbiddenOperationErrorMessage)
+	}
+
+	// Get dir metadata.
+	dirMeta, err := m.localFManDBRepo.GetDirMetadata(ctx, dirUUID)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] GetDirMetadata failed with error %s", err.Error())
+		return models.TmpFilePayload{}, errors.New(InternalErrorMessage)
+	}
+
+	// Get all child-files metadata.
+	fileMetadataList, err := m.localFManDBRepo.GetChildFileMetadataList(ctx, dirUUID)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] GetChildFileMetadataList failed with error %s", err.Error())
+		return models.TmpFilePayload{}, errors.New(InternalErrorMessage)
+	}
+
+	inZipPaths := make(map[string]string)
+	for _, childFileMeta := range fileMetadataList {
+		relPath, err := filepath.Rel(dirMeta.Path, childFileMeta.Path)
+		if err != nil {
+			logger.Errorf("[-INTERNAL-] filepath.Rel failed with error %s", err.Error())
+			return models.TmpFilePayload{}, errors.New(InternalErrorMessage)
+		}
+		inZipPaths[relPath] = childFileMeta.AbsPathOnDisk
+	}
+	tmpFile, err := m.fileCompress.CompressFiles(inZipPaths)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] CompressFiles failed with error %s", err.Error())
+		return models.TmpFilePayload{}, errors.New(InternalErrorMessage)
+	}
+	// Get zipped file size
+	tmpFStat, err := tmpFile.Stat()
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] Failed to read file stat %s", err.Error())
+		return models.TmpFilePayload{}, errors.New(InternalErrorMessage)
+	}
+	payload := models.TmpFilePayload{
+		Filename:      tmpFile.Name(),
+		ContentLength: tmpFStat.Size(),
+		File:          tmpFile,
+	}
+	return payload, nil
 }
 
 func (m *MultiOSLocalFManServiceHandler) SoftRemoveDir(ctx context.Context, userUUID, dirUUID string) error {
@@ -329,30 +534,26 @@ func (m *MultiOSLocalFManServiceHandler) SoftRemoveDir(ctx context.Context, user
 	logger.Debug("Start removing directory (SOFT)")
 	defer logger.Debug("Finish removing directory (SOFT)")
 	// Pre-validate inputs
+	if !m.uuidTool.ValidateUUID(userUUID) {
+		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
+		return errors.New(InvalidUserUUIDErrorMessage)
+	}
 	if !m.uuidTool.ValidateUUID(dirUUID) {
 		logger.Info("[-USER-]", InvalidDirUUIDErrorMessage)
 		return errors.New(InvalidDirUUIDErrorMessage)
 	}
-	isDirExist, err := m.localFManDBRepo.IsDirExist(ctx, userUUID, dirUUID)
+	// Authorization.
+	isAuthorized, err := m.author.AuthorizeActionsOnDir(ctx, userUUID, dirUUID, author.RemoveDirAction)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] IsDirExist failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
 		return errors.New(InternalErrorMessage)
 	}
-	if !isDirExist {
-		logger.Info("[-USER-]", InvalidDirUUIDErrorMessage)
-		return errors.New(InvalidDirUUIDErrorMessage)
+	if !isAuthorized {
+		logger.Info(ForbiddenOperationErrorMessage)
+		return errors.New(ForbiddenOperationErrorMessage)
 	}
-	// Cannot remove root dir
-	isRootDir, err := m.localFManDBRepo.IsRootDir(ctx, userUUID, dirUUID)
-	if err != nil {
-		logger.Errorf("[-INTERNAL-] IsRootDir failed with error %s", err.Error())
-		return errors.New(InternalErrorMessage)
-	}
-	if isRootDir {
-		logger.Info("[-USER-]", ForbiddenOperationOnRootDirErrorMessage)
-		return errors.New(ForbiddenOperationOnRootDirErrorMessage)
-	}
-	err = m.localFManDBRepo.SoftRemoveDir(ctx, userUUID, dirUUID)
+
+	err = m.localFManDBRepo.SoftRemoveDir(ctx, dirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] SoftRemoveFile failed with error %s", err.Error())
 		return errors.New(InternalErrorMessage)
@@ -371,30 +572,26 @@ func (m *MultiOSLocalFManServiceHandler) HardRemoveDir(ctx context.Context, user
 	logger.Debug("Start removing directory (HARD)")
 	defer logger.Debug("Finish removing directory (HARD)")
 	// Pre-validate inputs
+	if !m.uuidTool.ValidateUUID(userUUID) {
+		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
+		return errors.New(InvalidUserUUIDErrorMessage)
+	}
 	if !m.uuidTool.ValidateUUID(dirUUID) {
 		logger.Info("[-USER-]", InvalidDirUUIDErrorMessage)
 		return errors.New(InvalidDirUUIDErrorMessage)
 	}
-	isDirExist, err := m.localFManDBRepo.IsDirExist(ctx, userUUID, dirUUID)
+	// Authorization.
+	isAuthorized, err := m.author.AuthorizeActionsOnDir(ctx, userUUID, dirUUID, author.RemoveDirAction)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] IsDirExist failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
 		return errors.New(InternalErrorMessage)
 	}
-	if !isDirExist {
-		logger.Info("[-USER-]", InvalidDirUUIDErrorMessage)
-		return errors.New(InvalidDirUUIDErrorMessage)
+	if !isAuthorized {
+		logger.Info(ForbiddenOperationErrorMessage)
+		return errors.New(ForbiddenOperationErrorMessage)
 	}
-	// Cannot remove root dir
-	isRootDir, err := m.localFManDBRepo.IsRootDir(ctx, userUUID, dirUUID)
-	if err != nil {
-		logger.Errorf("[-INTERNAL-] IsRootDir failed with error %s", err.Error())
-		return errors.New(InternalErrorMessage)
-	}
-	if isRootDir {
-		logger.Info("[-USER-]", ForbiddenOperationOnRootDirErrorMessage)
-		return errors.New(ForbiddenOperationOnRootDirErrorMessage)
-	}
-	err = m.localFManDBRepo.HardRemoveDir(ctx, userUUID, dirUUID, m.fileOps.RemoveFile)
+
+	err = m.localFManDBRepo.HardRemoveDir(ctx, dirUUID, m.fileOps.RemoveFile)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] SoftRemoveFile failed with error %s", err.Error())
 		return errors.New(InternalErrorMessage)
@@ -413,18 +610,55 @@ func (m *MultiOSLocalFManServiceHandler) GetUUIDByPath(ctx context.Context, user
 	logger.Debug("Start retrieving UUID via path")
 	defer logger.Debug("Finish retrieving UUID via path")
 	// Pre-validate inputs
+	if !m.uuidTool.ValidateUUID(userUUID) {
+		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
+		return "", errors.New(InvalidUserUUIDErrorMessage)
+	}
+	path = filepath.Clean(path)
 	if path == "" {
 		logger.Info("[-USER-]", InvalidPathErrorMessage)
 		return "", errors.New(InvalidPathErrorMessage)
 	}
-	uuid, err := m.localFManDBRepo.GetUUIDByPath(ctx, userUUID, path)
+	// Get root dir metadata of the user
+	rootDirMeta, err := m.localFManDBRepo.GetRootDirMetadata(ctx, userUUID)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] GetUUIDByPath failed with error %s", err.Error())
+		return "", errors.New(InternalErrorMessage)
+	}
+
+	uuid, isDir, err := m.localFManDBRepo.GetUUIDByPath(ctx, rootDirMeta.UUID, path)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetUUIDByPath failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
 	}
 	if uuid == "" {
-		logger.Info("[-USER-]", InvalidPathErrorMessage)
-		return "", errors.New(InvalidPathErrorMessage)
+		logger.Info("[-USER-]", PathNotFoundMessage)
+		return "", errors.New(PathNotFoundMessage)
+	}
+	// Authorization. Note: Since we only
+	// know if the user has permission to view this UUID
+	// after retrieving the UUID, the authorization is executed
+	// at last.
+	if isDir {
+		isAuthorized, err := m.author.AuthorizeActionsOnDir(ctx, userUUID, uuid, author.ViewDirAction)
+		if err != nil {
+			logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
+			return "", errors.New(InternalErrorMessage)
+		}
+		if !isAuthorized {
+			logger.Info(ForbiddenOperationErrorMessage)
+			return "", errors.New(ForbiddenOperationErrorMessage)
+		}
+		return uuid, nil
+	}
+	isAuthorized, err := m.author.AuthorizeActionsOnFile(ctx, userUUID, uuid, author.ViewFileAction)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnFile failed with error %s", err.Error())
+		return "", errors.New(InternalErrorMessage)
+	}
+	if !isAuthorized {
+		logger.Info(ForbiddenOperationErrorMessage)
+		return "", errors.New(ForbiddenOperationErrorMessage)
 	}
 	return uuid, nil
 }
@@ -460,6 +694,10 @@ func (m *MultiOSLocalFManServiceHandler) UploadFile(ctx context.Context, userUUI
 	logger.Debug("Start uploading file")
 	defer logger.Debug("Finish uploading file")
 	// Pre-validate inputs
+	if !m.uuidTool.ValidateUUID(userUUID) {
+		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
+		return "", errors.New(InvalidUserUUIDErrorMessage)
+	}
 	if !fileUtils.IsFilenameOk(filename) {
 		logger.Info("[-USER-]", InvalidFileNameErrorMessage)
 		return "", errors.New(InvalidFileNameErrorMessage)
@@ -468,18 +706,19 @@ func (m *MultiOSLocalFManServiceHandler) UploadFile(ctx context.Context, userUUI
 		logger.Info("[-USER-]", InvalidParentDirUUIDErrorMessage)
 		return "", errors.New(InvalidParentDirUUIDErrorMessage)
 	}
-	// Validate parent UUID.
-	isParentDirExist, err := m.localFManDBRepo.IsDirExist(ctx, userUUID, parentDirUUID)
+	// Authorization.
+	isAuthorized, err := m.author.AuthorizeActionsOnDir(ctx, userUUID, parentDirUUID, author.UploadToDirAction)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] IsDirExist failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
 	}
-	if !isParentDirExist {
-		logger.Infof("[-USER-] parent directory UUID (%s) does not exist", parentDirUUID)
-		return "", errors.New(InvalidParentDirUUIDErrorMessage)
+	if !isAuthorized {
+		logger.Info(ForbiddenOperationErrorMessage)
+		return "", errors.New(ForbiddenOperationErrorMessage)
 	}
+
 	// Check if the file already exists in a desired location in the db.
-	isFilenameExist, err := m.localFManDBRepo.IsNameExist(ctx, userUUID, filename, parentDirUUID)
+	isFilenameExist, err := m.localFManDBRepo.IsNameExist(ctx, filename, parentDirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsNameExist failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
@@ -534,6 +773,10 @@ func (m *MultiOSLocalFManServiceHandler) CopyFile(ctx context.Context, userUUID,
 	logger.Debug("Start copying file")
 	defer logger.Debug("Finish copying file")
 	// Pre-validate inputs
+	if !m.uuidTool.ValidateUUID(userUUID) {
+		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
+		return "", errors.New(InvalidUserUUIDErrorMessage)
+	}
 	if !m.uuidTool.ValidateUUID(fileUUID) {
 		logger.Info("[-USER-]", InvalidFileUUIDErrorMessage)
 		return "", errors.New(InvalidFileUUIDErrorMessage)
@@ -542,28 +785,37 @@ func (m *MultiOSLocalFManServiceHandler) CopyFile(ctx context.Context, userUUID,
 		logger.Info("[-USER-]", InvalidParentDirUUIDErrorMessage)
 		return "", errors.New(InvalidParentDirUUIDErrorMessage)
 	}
-	// Validate dst parent UUID.
-	isParentDirExist, err := m.localFManDBRepo.IsDirExist(ctx, userUUID, dstParentDirUUID)
+	// Authorization.
+	isAuthorized, err := m.author.AuthorizeActionsOnDir(ctx, userUUID, dstParentDirUUID, author.UploadToDirAction)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] IsDirExist failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
 	}
-	if !isParentDirExist {
-		logger.Infof("[-USER-] parent directory UUID (%s) does not exist", dstParentDirUUID)
-		return "", errors.New(InvalidParentDirUUIDErrorMessage)
+	if !isAuthorized {
+		logger.Info(ForbiddenOperationErrorMessage)
+		return "", errors.New(ForbiddenOperationErrorMessage)
 	}
+	isAuthorized, err = m.author.AuthorizeActionsOnFile(ctx, userUUID, fileUUID, author.CopyFileAction)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnFile failed with error %s", err.Error())
+		return "", errors.New(InternalErrorMessage)
+	}
+	if !isAuthorized {
+		logger.Info(ForbiddenOperationErrorMessage)
+		return "", errors.New(ForbiddenOperationErrorMessage)
+	}
+	return m.copyFile(ctx, logger, userUUID, fileUUID, dstParentDirUUID)
+}
+
+func (m *MultiOSLocalFManServiceHandler) copyFile(ctx context.Context, logger *log.Entry, userUUID, fileUUID, dstParentDirUUID string) (string, error) {
 	// Get the source file metadata.
-	srcFile, err := m.localFManDBRepo.GetFileMetadata(ctx, userUUID, fileUUID)
+	srcFile, err := m.localFManDBRepo.GetFileMetadata(ctx, fileUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetFileMetadata failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
 	}
-	if (srcFile == models.FileMetadata{}) {
-		logger.Infof("[-USER-] file UUID (%s) does not exist", fileUUID)
-		return "", errors.New(InvalidFileUUIDErrorMessage)
-	}
 	// Check if the file already exists in a desired location in the db.
-	isExist, err := m.localFManDBRepo.IsNameExist(ctx, userUUID, srcFile.Filename, dstParentDirUUID)
+	isExist, err := m.localFManDBRepo.IsNameExist(ctx, srcFile.Filename, dstParentDirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsNameExist failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
@@ -572,7 +824,7 @@ func (m *MultiOSLocalFManServiceHandler) CopyFile(ctx context.Context, userUUID,
 		logger.Infof("[-USER-] %s already exists in the desired location", srcFile.Filename)
 		return "", errors.New(NameAlreadyExistErrorMessage)
 	}
-	// Get source file pointer to read its content.
+	// Get source file reader to read its content.
 	srcFReadCloser, err := m.fileOps.ReadFile(srcFile.AbsPathOnDisk)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] ReadFile failed with error %s", err.Error())
@@ -595,7 +847,7 @@ func (m *MultiOSLocalFManServiceHandler) CopyFile(ctx context.Context, userUUID,
 		AbsPathOnDisk: realPath,
 		ParentUUID:    dstParentDirUUID,
 		Size:          size,
-		OwnerUUID:     userUUID,
+		OwnerUUID:     userUUID, // other user can copy the owner's file (if permited)
 	}
 	// Insert a new file metadata to the DB.
 	if err = m.localFManDBRepo.InsertFileMetadata(ctx, newFileMetadata); err != nil {
@@ -625,6 +877,10 @@ func (m *MultiOSLocalFManServiceHandler) MoveFile(ctx context.Context, userUUID,
 	logger.Debug("Start moving file")
 	defer logger.Debug("Finish moving file")
 	// Pre-validate inputs
+	if !m.uuidTool.ValidateUUID(userUUID) {
+		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
+		return "", errors.New(InvalidUserUUIDErrorMessage)
+	}
 	if !m.uuidTool.ValidateUUID(fileUUID) {
 		logger.Info("[-USER-]", InvalidFileUUIDErrorMessage)
 		return "", errors.New(InvalidFileUUIDErrorMessage)
@@ -633,28 +889,34 @@ func (m *MultiOSLocalFManServiceHandler) MoveFile(ctx context.Context, userUUID,
 		logger.Info("[-USER-]", InvalidParentDirUUIDErrorMessage)
 		return "", errors.New(InvalidParentDirUUIDErrorMessage)
 	}
-	// Validate dst parent UUID.
-	isParentDirExist, err := m.localFManDBRepo.IsDirExist(ctx, userUUID, dstParentDirUUID)
+	// Authorization.
+	isAuthorized, err := m.author.AuthorizeActionsOnDir(ctx, userUUID, dstParentDirUUID, author.UploadToDirAction)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] IsDirExist failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
 	}
-	if !isParentDirExist {
-		logger.Infof("[-USER-] parent directory UUID (%s) does not exist", dstParentDirUUID)
-		return "", errors.New(InvalidParentDirUUIDErrorMessage)
+	if !isAuthorized {
+		logger.Info(ForbiddenOperationErrorMessage)
+		return "", errors.New(ForbiddenOperationErrorMessage)
 	}
+	isAuthorized, err = m.author.AuthorizeActionsOnFile(ctx, userUUID, fileUUID, author.CopyFileAction, author.RemoveFileAction)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnFile failed with error %s", err.Error())
+		return "", errors.New(InternalErrorMessage)
+	}
+	if !isAuthorized {
+		logger.Info(ForbiddenOperationErrorMessage)
+		return "", errors.New(ForbiddenOperationErrorMessage)
+	}
+
 	// Get the file metadata.
-	srcFile, err := m.localFManDBRepo.GetFileMetadata(ctx, userUUID, fileUUID)
+	srcFile, err := m.localFManDBRepo.GetFileMetadata(ctx, fileUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetFileMetadata failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
 	}
-	if (srcFile == models.FileMetadata{}) {
-		logger.Infof("[-USER-] file UUID (%s) does not exist", fileUUID)
-		return "", errors.New(InvalidFileUUIDErrorMessage)
-	}
 	// Check if the file already exists in a desired location in the db.
-	isExist, err := m.localFManDBRepo.IsNameExist(ctx, userUUID, srcFile.Filename, dstParentDirUUID)
+	isExist, err := m.localFManDBRepo.IsNameExist(ctx, srcFile.Filename, dstParentDirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsNameExist failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
@@ -682,19 +944,30 @@ func (m *MultiOSLocalFManServiceHandler) GetFile(ctx context.Context, userUUID, 
 	logger.Debug("Start retrieving file metadata")
 	defer logger.Debug("Finish retrieving file metadata")
 	// Pre-validate inputs
+	if !m.uuidTool.ValidateUUID(userUUID) {
+		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
+		return models.File{}, errors.New(InvalidUserUUIDErrorMessage)
+	}
 	if !m.uuidTool.ValidateUUID(fileUUID) {
 		logger.Info("[-USER-]", InvalidFileUUIDErrorMessage)
 		return models.File{}, errors.New(InvalidFileUUIDErrorMessage)
 	}
+	// Authorization.
+	isAuthorized, err := m.author.AuthorizeActionsOnFile(ctx, userUUID, fileUUID, author.ViewFileAction)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnFile failed with error %s", err.Error())
+		return models.File{}, errors.New(InternalErrorMessage)
+	}
+	if !isAuthorized {
+		logger.Info(ForbiddenOperationErrorMessage)
+		return models.File{}, errors.New(ForbiddenOperationErrorMessage)
+	}
+
 	// Get the file metadata.
-	srcFile, err := m.localFManDBRepo.GetFile(ctx, userUUID, fileUUID)
+	srcFile, err := m.localFManDBRepo.GetFile(ctx, fileUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetFile failed with error %s", err.Error())
 		return models.File{}, errors.New(InternalErrorMessage)
-	}
-	if (srcFile == models.File{}) {
-		logger.Infof("[-USER-] file UUID (%s) does not exist", fileUUID)
-		return models.File{}, errors.New(InvalidFileUUIDErrorMessage)
 	}
 	return srcFile, nil
 }
@@ -709,19 +982,30 @@ func (m *MultiOSLocalFManServiceHandler) DownloadFile(ctx context.Context, userU
 	logger.Debug("Start getting file payload")
 	defer logger.Debug("Finish getting file payload")
 	// Pre-validate inputs
+	if !m.uuidTool.ValidateUUID(userUUID) {
+		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
+		return models.FilePayload{}, errors.New(InvalidUserUUIDErrorMessage)
+	}
 	if !m.uuidTool.ValidateUUID(fileUUID) {
 		logger.Info("[-USER-]", InvalidFileUUIDErrorMessage)
 		return models.FilePayload{}, errors.New(InvalidFileUUIDErrorMessage)
 	}
+	// Authorization.
+	isAuthorized, err := m.author.AuthorizeActionsOnFile(ctx, userUUID, fileUUID, author.ViewFileAction)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnFile failed with error %s", err.Error())
+		return models.FilePayload{}, errors.New(InternalErrorMessage)
+	}
+	if !isAuthorized {
+		logger.Info(ForbiddenOperationErrorMessage)
+		return models.FilePayload{}, errors.New(ForbiddenOperationErrorMessage)
+	}
+
 	// Get the file metadata.
-	srcFile, err := m.localFManDBRepo.GetFileMetadata(ctx, userUUID, fileUUID)
+	srcFile, err := m.localFManDBRepo.GetFileMetadata(ctx, fileUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetFileMetadata failed with error %s", err.Error())
 		return models.FilePayload{}, errors.New(InternalErrorMessage)
-	}
-	if (srcFile == models.FileMetadata{}) {
-		logger.Infof("[-USER-] file UUID (%s) does not exist", fileUUID)
-		return models.FilePayload{}, errors.New(InvalidFileUUIDErrorMessage)
 	}
 	fileRCloser, err := m.fileOps.ReadFile(srcFile.AbsPathOnDisk)
 	if err != nil {
@@ -746,21 +1030,33 @@ func (m *MultiOSLocalFManServiceHandler) DownloadFileBatch(ctx context.Context, 
 	logger.Debug("Start getting files' payloads")
 	defer logger.Debug("Finish getting files' payloads")
 	// Pre-validate inputs
+	if !m.uuidTool.ValidateUUID(userUUID) {
+		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
+		return models.TmpFilePayload{}, errors.New(InvalidUserUUIDErrorMessage)
+	}
 	for _, uuid := range fileUUIDs {
 		if !m.uuidTool.ValidateUUID(uuid) {
 			logger.Info("[-USER-]", InvalidFileUUIDErrorMessage)
 			return models.TmpFilePayload{}, errors.New(InvalidFileUUIDErrorMessage)
 		}
 	}
+	// Authorization.
+	for _, uuid := range fileUUIDs {
+		isAuthorized, err := m.author.AuthorizeActionsOnFile(ctx, userUUID, uuid, author.ViewFileAction)
+		if err != nil {
+			logger.Errorf("[-INTERNAL-] AuthorizeActionsOnFile failed with error %s", err.Error())
+			return models.TmpFilePayload{}, errors.New(InternalErrorMessage)
+		}
+		if !isAuthorized {
+			logger.Info(ForbiddenOperationErrorMessage)
+			return models.TmpFilePayload{}, errors.New(ForbiddenOperationErrorMessage)
+		}
+	}
 	// Get the files' metadata.
-	srcFiles, err := m.localFManDBRepo.GetFileMetadataBatch(ctx, userUUID, fileUUIDs)
+	srcFiles, err := m.localFManDBRepo.GetFileMetadataBatch(ctx, fileUUIDs)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetFileMetadataBatch failed with error %s", err.Error())
 		return models.TmpFilePayload{}, errors.New(InternalErrorMessage)
-	}
-	if len(srcFiles) == 0 {
-		logger.Infof("[-USER-] all file UUIDs (%v) do not exist", fileUUIDs)
-		return models.TmpFilePayload{}, errors.New(InvalidFileUUIDErrorMessage)
 	}
 	inZipPaths := make(map[string]string)
 	for _, srcFile := range srcFiles {
@@ -796,6 +1092,10 @@ func (m *MultiOSLocalFManServiceHandler) SearchByName(ctx context.Context, userU
 	logger.Debug("Start retrieving UUID via path")
 	defer logger.Debug("Finish retrieving UUID via path")
 	// Pre-validate inputs
+	if !m.uuidTool.ValidateUUID(userUUID) {
+		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
+		return nil, nil, errors.New(InvalidUserUUIDErrorMessage)
+	}
 	if !fileUtils.IsFilenameOk(filename) {
 		logger.Info("[-USER-]", InvalidFileNameErrorMessage)
 		return nil, nil, errors.New(InvalidFileNameErrorMessage)
@@ -804,16 +1104,17 @@ func (m *MultiOSLocalFManServiceHandler) SearchByName(ctx context.Context, userU
 		logger.Info("[-USER-]", InvalidParentDirUUIDErrorMessage)
 		return nil, nil, errors.New(InvalidParentDirUUIDErrorMessage)
 	}
-	// Validate parent UUID.
-	isParentDirExist, err := m.localFManDBRepo.IsDirExist(ctx, userUUID, parentDirUUID)
+	// Authorization.
+	isAuthorized, err := m.author.AuthorizeActionsOnDir(ctx, userUUID, parentDirUUID, author.ViewDirAction)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] IsDirExist failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
 		return nil, nil, errors.New(InternalErrorMessage)
 	}
-	if !isParentDirExist {
-		logger.Infof("[-USER-] parent directory UUID (%s) does not exist", parentDirUUID)
-		return nil, nil, errors.New(InvalidParentDirUUIDErrorMessage)
+	if !isAuthorized {
+		logger.Info(ForbiddenOperationErrorMessage)
+		return nil, nil, errors.New(ForbiddenOperationErrorMessage)
 	}
+
 	files, dirs, err := m.localFManDBRepo.SearchByName(ctx, userUUID, filename, parentDirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetUUIDByPath failed with error %s", err.Error())
@@ -833,6 +1134,10 @@ func (m *MultiOSLocalFManServiceHandler) CreateNewDirectory(ctx context.Context,
 	logger.Debug("Start creating a new directory")
 	defer logger.Debug("Finish creating a new directory")
 	// Pre-validate inputs
+	if m.uuidTool.ValidateUUID(userUUID) {
+		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
+		return "", errors.New(InvalidUserUUIDErrorMessage)
+	}
 	if !fileUtils.IsFilenameOk(dirname) {
 		logger.Info("[-USER-]", InvalidDirNameErrorMessage)
 		return "", errors.New(InvalidDirNameErrorMessage)
@@ -841,18 +1146,23 @@ func (m *MultiOSLocalFManServiceHandler) CreateNewDirectory(ctx context.Context,
 		logger.Info("[-USER-]", InvalidDirNameErrorMessage)
 		return "", errors.New(InvalidDirNameErrorMessage)
 	}
-	// Validate parent UUID.
-	isParentDirExist, err := m.localFManDBRepo.IsDirExist(ctx, userUUID, parentDirUUID)
+	// Authorization.
+	isAuthorized, err := m.author.AuthorizeActionsOnDir(ctx, userUUID, parentDirUUID, author.UploadToDirAction)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] IsDirExist failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
 	}
-	if !isParentDirExist {
-		logger.Infof("[-USER-] parent directory UUID (%s) does not exist", parentDirUUID)
-		return "", errors.New(InvalidParentDirUUIDErrorMessage)
+	if !isAuthorized {
+		logger.Info(ForbiddenOperationErrorMessage)
+		return "", errors.New(ForbiddenOperationErrorMessage)
 	}
+
+	return m.createNewDirectory(ctx, logger, userUUID, dirname, parentDirUUID)
+}
+
+func (m *MultiOSLocalFManServiceHandler) createNewDirectory(ctx context.Context, logger *log.Entry, userUUID, dirname, parentDirUUID string) (string, error) {
 	// Check if the directory already exists in a desired location in the db.
-	isExist, err := m.localFManDBRepo.IsNameExist(ctx, userUUID, dirname, parentDirUUID)
+	isExist, err := m.localFManDBRepo.IsNameExist(ctx, dirname, parentDirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsNameExist failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)

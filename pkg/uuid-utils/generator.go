@@ -22,7 +22,7 @@ func (g *GoogleUUIDGenerator) NewUUID() string {
 	return guuid.NewString()
 }
 
-// NewUUID validates a specific UUID (using google/uuid lib).
+// ValidateUUID validates a specific UUID (using google/uuid lib).
 func (g *GoogleUUIDGenerator) ValidateUUID(uuid string) bool {
 	_, err := guuid.Parse(uuid)
 	return err == nil

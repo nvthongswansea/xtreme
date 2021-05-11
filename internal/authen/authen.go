@@ -1,5 +1,7 @@
 package authen
 
+import "context"
+
 // Authenticator holds operations on authenticate users.
 type Authenticator interface {
 	// Register registers a user.
@@ -9,7 +11,7 @@ type Authenticator interface {
 	// There are 2 types of errors:
 	// - Internal server error happening when something is broken.
 	// - Bad username error happening when the username already exists.
-	Register(username, password string) error
+	Register(ctx context.Context, username, password string) error
 
 	// Login authenticates a user.
 	// Input: username (string), password (string).
@@ -19,5 +21,5 @@ type Authenticator interface {
 	// There are 2 types of errors:
 	// - Internal server error happening when something is broken.
 	// - Authenticate error happens when username or password are incorrect.
-	Login(username, password string) (string, error)
+	Login(ctx context.Context, username, password string) (string, error)
 }

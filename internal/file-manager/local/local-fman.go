@@ -1,4 +1,4 @@
-package svhander
+package local
 
 import (
 	"context"
@@ -7,8 +7,8 @@ import (
 	"github.com/nvthongswansea/xtreme/internal/models"
 )
 
-// LocalFManServiceHandler provides an interface for handling files/directories on local storage service.
-type LocalFManServiceHandler interface {
+// LocalStorageFManager provides an interface for handling files/directories on local storage service.
+type LocalStorageFManager interface {
 	// Get a file/directory's UUID by a given path.
 	GetUUIDByPath(ctx context.Context, userUUID, path string) (string, error)
 
@@ -51,6 +51,9 @@ type LocalFManServiceHandler interface {
 
 	// Get a directory.
 	GetDirectory(ctx context.Context, userUUID, dirUUID string) (models.Directory, error)
+
+	// Get root directory.
+	GetRootDirectory(ctx context.Context, userUUID string) (models.Directory, error)
 
 	// Copy a directory/folder to a new location.
 	CopyDirectory(ctx context.Context, userUUID, dirUUID, dstParentDirUUID string) (string, error)

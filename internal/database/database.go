@@ -43,16 +43,20 @@ type DBEntityMetadataInserter interface {
 // DBEntityGetter holds retrieval operations on db.
 type DBEntityGetter interface {
 	// GetFile gets a file record from the db with a given UUID.
-	GetFile(ctx context.Context, userUUID, fileUUID string) (models.File, error)
+	GetFile(ctx context.Context, fileUUID string) (models.File, error)
 
 	// GetDirectory gets a directory/folder record from the db with a given UUID.
-	GetDirectory(ctx context.Context, userUUID, dirUUID string) (models.Directory, error)
+	GetDirectory(ctx context.Context, dirUUID string) (models.Directory, error)
+
+	// GetRootDirectory gets a user's root directory from the db.
+	GetRootDirectory(ctx context.Context, userUUID string) (models.Directory, error)
 
 	// GetUUIDByPath gets a file/directory's UUID by a given path.
-	GetUUIDByPath(ctx context.Context, userUUID, path string) (string, error)
+	GetUUIDByPath(ctx context.Context, rootDirUUID, path string) (string, bool, error)
 
-	// GetChildFileUUIDs gets all child-files' UUIDs in a given directory.
-	GetChildFileUUIDs(ctx context.Context, userUUID, dirUUID string) ([]string, error)
+	// GetDirectChildDirUUIDList get direct child-directories' UUIDs
+	// of a specific directory.
+	GetDirectChildDirUUIDList(ctx context.Context, dirUUID string) ([]string, error)
 
 	DBEntityMetadataGetter
 }
@@ -60,13 +64,19 @@ type DBEntityGetter interface {
 // DBEntityMetadataGetter holds metadata retrieval operations on db.
 type DBEntityMetadataGetter interface {
 	// GetFileMetadata gets file metadata from the db with a given UUID.
-	GetFileMetadata(ctx context.Context, userUUID, fileUUID string) (models.FileMetadata, error)
+	GetFileMetadata(ctx context.Context, fileUUID string) (models.FileMetadata, error)
 
 	// GetFileMetadataBatch gets multiple files' metadata from the db with given UUIDs.
-	GetFileMetadataBatch(ctx context.Context, userUUID string, fileUUIDs []string) ([]models.FileMetadata, error)
+	GetFileMetadataBatch(ctx context.Context, fileUUIDs []string) ([]models.FileMetadata, error)
+
+	// GetChildFileMetadataList gets all child-files' metadata in a given directory.
+	GetChildFileMetadataList(ctx context.Context, dirUUID string) ([]models.FileMetadata, error)
+
+	// GetRootDirMetadata gets a user's root directory metadata from the db.
+	GetRootDirMetadata(ctx context.Context, userUUID string) (models.DirectoryMetadata, error)
 
 	// GetDirMetadata gets directory/folder metadata from the db with a given UUID.
-	GetDirMetadata(ctx context.Context, userUUID, dirUUID string) (models.DirectoryMetadata, error)
+	GetDirMetadata(ctx context.Context, dirUUID string) (models.DirectoryMetadata, error)
 }
 
 // DBEntityUpdater holds updating operations on db.
@@ -87,23 +97,23 @@ type DBEntityMetadataUpdater interface {
 type DBEntityRemover interface {
 	// SoftRemoveFile flags a file record as deleted file.
 	// e.g. set `is_deleted` field to true.
-	SoftRemoveFile(ctx context.Context, userUUID, fileUUID string) error
+	SoftRemoveFile(ctx context.Context, fileUUID string) error
 
 	// HardRemoveFile removes a file record completely from the db.
-	HardRemoveFile(ctx context.Context, userUUID, fileUUID string, fileRmCallback func(string) error) error
+	HardRemoveFile(ctx context.Context, fileUUID string, fileRmCallback func(string) error) error
 
 	// SoftRemoveDir flags a directory/folder record as deleted file.
 	// e.g. set `is_deleted` field to true.
-	SoftRemoveDir(ctx context.Context, userUUID, dirUUID string) error
+	SoftRemoveDir(ctx context.Context, dirUUID string) error
 
 	// HardRemoveDir removes a directory/folder record completely from the db.
-	HardRemoveDir(ctx context.Context, userUUID, dirUUID string, fileRmCallback func(string) error) error
+	HardRemoveDir(ctx context.Context, dirUUID string, fileRmCallback func(string) error) error
 }
 
 // DBEntityValidator holds validating operations on db.
 type DBEntityValidator interface {
 	// IsNameExist checks if a specific file/dir's name exists in a specific directory.
-	IsNameExist(ctx context.Context, userUUID, name, parentDirUUID string) (bool, error)
+	IsNameExist(ctx context.Context, name, parentDirUUID string) (bool, error)
 
 	// IsUserUUIDExist checks if a user UUID exists.
 	IsUserUUIDExist(ctx context.Context, userUUID string) (bool, error)
