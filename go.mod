@@ -3,6 +3,7 @@ module github.com/nvthongswansea/xtreme
 go 1.16
 
 require (
+	github.com/casbin/casbin/v2 v2.30.1 // indirect
 	github.com/google/uuid v1.2.0
 	github.com/labstack/echo/v4 v4.2.2
 	github.com/mattn/go-colorable v0.1.8 // indirect
