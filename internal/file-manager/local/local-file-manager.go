@@ -7,21 +7,40 @@ import (
 	"github.com/nvthongswansea/xtreme/internal/models"
 )
 
-// LocalStorageFManager provides an interface for handling files/directories on local storage service.
-type LocalStorageFManager interface {
-	// Get a file/directory's UUID by a given path.
+// FileManager provides an interface for handling files/directories on local storage service.
+type FileManager interface {
+	// GetUUIDByPath gets a file/directory's UUID by a given path.
 	GetUUIDByPath(ctx context.Context, userUUID, path string) (string, error)
 
-	// Create a new file.
+	// CreateNewFile creates a new empty file with a given name.
+	// It returns a new file UUID, if success.
+	// Conditions for success:
+	// - User has permission to create a new file in
+	// the given directory.
+	// - The filename is not taken by any child-files/dirs in
+	// the given directory.
 	CreateNewFile(ctx context.Context, userUUID, filename, parentDirUUID string) (string, error)
 
-	// Uploads a single file.
-	UploadFile(ctx context.Context, userUUID, filename, parentDirUUID string, fileReadCloser io.ReadCloser) (string, error)
+	// UploadFile uploads a single file. The content of the file/data stream
+	// should be readable (and closable) via an io.ReadCloser instance.
+	// UploadFile returns a new file UUID, if success.
+	// Conditions for success:
+	// - User has permission to create a new file in
+	// the given directory.
+	// - The filename is not taken by any child-files/dirs in
+	// the given directory.
+	// - The data stream in io.ReadCloser is valid.
+	UploadFile(ctx context.Context, userUUID, filename, parentDirUUID string, contentReader io.Reader) (string, error)
 
-	// Copy a file to a new location.
+	// CopyFile copies a file to a new location.
+	// Note: Beside the new parent dir, the owner
+	// of the file could be changed.
 	CopyFile(ctx context.Context, userUUID, fileUUID, dstParentDirUUID string) (string, error)
 
-	// Rename a file.
+	// RenameFile renames a file.
+	// This function succeeds, if:
+	// - The file exists (within user storage space context).
+	// - The new name doesn't present in the current directory.
 	RenameFile(ctx context.Context, userUUID, fileUUID, newFileName string) error
 
 	// Move a file.

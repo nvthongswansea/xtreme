@@ -5,16 +5,6 @@ import (
 	"github.com/nvthongswansea/xtreme/internal/models"
 )
 
-// Repository holds all operations to deal with the database.
-type Repository interface {
-	DBEntityInserter
-	DBEntityGetter
-	DBEntitySearcher
-	DBEntityUpdater
-	DBEntityRemover
-	DBEntityValidator
-}
-
 // LocalFManRepository holds all operations on the db,
 // which are used by local storage's file manager.
 type LocalFManRepository interface {
@@ -114,22 +104,10 @@ type DBEntityRemover interface {
 type DBEntityValidator interface {
 	// IsNameExist checks if a specific file/dir's name exists in a specific directory.
 	IsNameExist(ctx context.Context, name, parentDirUUID string) (bool, error)
-
-	// IsUserUUIDExist checks if a user UUID exists.
-	IsUserUUIDExist(ctx context.Context, userUUID string) (bool, error)
-
-	// IsFileExist checks if a file UUID exists.
-	IsFileExist(ctx context.Context, userUUID, fileUUID string) (bool, error)
-
-	// IsDirExist checks if a parent directory UUID exists.
-	IsDirExist(ctx context.Context, userUUID, parentDirUUID string) (bool, error)
-
-	// IsRootDir checks if the given directory is a root directory.
-	IsRootDir(ctx context.Context, userUUID, dirUUID string) (bool, error)
 }
 
 // DBEntitySearcher holds searching operations on db.
 type DBEntitySearcher interface {
-	// Search all files/directories based on given filename within a specific path.
+	// SearchByName searches all files/directories based on given filename within a specific path.
 	SearchByName(ctx context.Context, userUUID, filename, parentDirUUID string) ([]models.File, []models.Directory, error)
 }

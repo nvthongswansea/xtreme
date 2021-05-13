@@ -11,7 +11,7 @@ import (
 )
 
 type FileCompressor interface {
-	CompressFiles(inZipPaths map[string]string) (*os.File, error)
+	CompressFiles(inZipPaths map[string]string) (string, error)
 }
 
 type FileZipper struct {
@@ -25,13 +25,14 @@ func CreateNewFileZipper(basePath, tmpFilePath string) *FileZipper {
 	}
 }
 
-func (z *FileZipper) CompressFiles(inZipPaths map[string]string) (*os.File, error) {
-	tmpfile, err := ioutil.TempFile("", "compress_temp_*")
+func (z *FileZipper) CompressFiles(inZipPaths map[string]string) (string, error) {
+	tmpFile, err := ioutil.TempFile("", "compress_temp_*")
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer tmpFile.Close()
 	// Create a buffer to write a file.
-	bufFWriter := bufio.NewWriter(tmpfile)
+	bufFWriter := bufio.NewWriter(tmpFile)
 	defer bufFWriter.Flush()
 	// Create a new zip writer (which writes to temp file)
 	zipWriter := zip.NewWriter(bufFWriter)
@@ -40,21 +41,21 @@ func (z *FileZipper) CompressFiles(inZipPaths map[string]string) (*os.File, erro
 		// Create a new path inside the zip file
 		f, err := zipWriter.Create(pathInZip)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 		absFilePath := filepath.Join(z.basePath, relFilePathOD)
 		// Read content of file which needs to be zipped.
 		fileToZip, err := os.Open(absFilePath)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 		// Copy the content from real file to the file(in zip).
 		_, err = io.Copy(f, fileToZip)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 		// Close the real file.
 		fileToZip.Close()
 	}
-	return tmpfile, nil
+	return filepath.Rel(z.basePath, tmpFile.Name())
 }

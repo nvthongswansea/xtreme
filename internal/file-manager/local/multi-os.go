@@ -36,7 +36,7 @@ const (
 type MultiOSLocalFManServiceHandler struct {
 	localFManDBRepo database.LocalFManRepository
 	uuidTool        uuidUtils.UUIDGenerateValidator
-	fileOps         fileUtils.FileSaveReadRemover
+	fileOps         fileUtils.FileSaveReadCpRmer
 	fileCompress    fileUtils.FileCompressor
 	author author.Authorizer
 }
@@ -66,7 +66,7 @@ func (m *MultiOSLocalFManServiceHandler) GetRootDirectory(ctx context.Context, u
 
 // NewMultiOSLocalFManServiceHandler creates a new MultiOSLocalFManServiceHandler.
 func NewMultiOSLocalFManServiceHandler(localFManDBRepo database.LocalFManRepository, uuidTool uuidUtils.UUIDGenerateValidator,
-	fileOps fileUtils.FileSaveReadRemover, fileCompress fileUtils.FileCompressor, author author.Authorizer) *MultiOSLocalFManServiceHandler {
+	fileOps fileUtils.FileSaveReadCpRmer, fileCompress fileUtils.FileCompressor, author author.Authorizer) *MultiOSLocalFManServiceHandler {
 	return &MultiOSLocalFManServiceHandler{
 		localFManDBRepo,
 		uuidTool,
@@ -319,7 +319,7 @@ func (m *MultiOSLocalFManServiceHandler) copyDirectory(ctx context.Context, logg
 		return "", errors.New(InternalErrorMessage)
 	}
 	for _, childDirUUID := range dChildDirUUIDList {
-		// Recursively do copy the child directories with their child files/directories.
+		// Recursively copy the child directories with their child files/directories.
 		_, err := m.copyDirectory(ctx, logger, userUUID, childDirUUID, nDirCopyUUID)
 		if err != nil {
 			logger.Errorf("[-INTERNAL-] copyDirectory failed with error %s", err.Error())
@@ -502,23 +502,21 @@ func (m *MultiOSLocalFManServiceHandler) DownloadDirectory(ctx context.Context, 
 			logger.Errorf("[-INTERNAL-] filepath.Rel failed with error %s", err.Error())
 			return models.TmpFilePayload{}, errors.New(InternalErrorMessage)
 		}
-		inZipPaths[relPath] = childFileMeta.AbsPathOnDisk
+		inZipPaths[relPath] = childFileMeta.RelPathOnDisk
 	}
-	tmpFile, err := m.fileCompress.CompressFiles(inZipPaths)
+	tmpFilePath, err := m.fileCompress.CompressFiles(inZipPaths)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] CompressFiles failed with error %s", err.Error())
 		return models.TmpFilePayload{}, errors.New(InternalErrorMessage)
 	}
-	// Get zipped file size
-	tmpFStat, err := tmpFile.Stat()
+	tmpFHanlder, err := m.fileOps.GetTmpFileHandler(tmpFilePath)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] Failed to read file stat %s", err.Error())
+		logger.Errorf("[-INTERNAL-] GetTmpFileHandler failed with error %s", err.Error())
 		return models.TmpFilePayload{}, errors.New(InternalErrorMessage)
 	}
 	payload := models.TmpFilePayload{
-		Filename:      tmpFile.Name(),
-		ContentLength: tmpFStat.Size(),
-		File:          tmpFile,
+		Filename:      filepath.Base(tmpFilePath),
+		TmpFile:       tmpFHanlder,
 	}
 	return payload, nil
 }
@@ -681,9 +679,7 @@ func (m *MultiOSLocalFManServiceHandler) CreateNewFile(ctx context.Context, user
 	return m.UploadFile(ctx, userUUID, filename, parentDirUUID, contentReadCloser)
 }
 
-func (m *MultiOSLocalFManServiceHandler) UploadFile(ctx context.Context, userUUID, filename, parentDirUUID string, fileReadCloser io.ReadCloser) (string, error) {
-	// Make sure the fileReadCloser is closed at the end.
-	defer fileReadCloser.Close()
+func (m *MultiOSLocalFManServiceHandler) UploadFile(ctx context.Context, userUUID, filename, parentDirUUID string, contentReader io.Reader) (string, error) {
 	logger := log.WithFields(log.Fields{
 		"Loc":           "local-service_handler-multi_os",
 		"Operation":     "UploadFile",
@@ -730,17 +726,17 @@ func (m *MultiOSLocalFManServiceHandler) UploadFile(ctx context.Context, userUUI
 	// Generate a new UUID.
 	newFileUUID := m.uuidTool.NewUUID()
 	logger = logger.WithField("newFileUUID", newFileUUID)
-	// Save file to the local disk.
-	relFilePath := filepath.Join(userUUID, newFileUUID)
-	size, absPathOD, err := m.fileOps.SaveCloseFile(relFilePath, fileReadCloser)
+	// Save file to the local storage.
+	relPathOD := filepath.Join(userUUID, newFileUUID)
+	size, err := m.fileOps.SaveFile(relPathOD, contentReader)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] SaveCloseFile failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] SaveFile failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
 	}
 	newFileMetadata := models.FileMetadata{
 		UUID:          newFileUUID,
 		Filename:      filename,
-		AbsPathOnDisk: absPathOD,
+		RelPathOnDisk: relPathOD,
 		ParentUUID:    parentDirUUID,
 		Size:          size,
 		OwnerUUID:     userUUID,
@@ -756,7 +752,7 @@ func (m *MultiOSLocalFManServiceHandler) UploadFile(ctx context.Context, userUUI
 				logger.Errorf("[-INTERNAL-] RemoveFile failed with error %s", err.Error())
 			}
 		}()
-		logger.Errorf("[-INTERNAL-] InsertFileRecord failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] InsertFileMetadata failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
 	}
 	return newFileUUID, nil
@@ -825,29 +821,30 @@ func (m *MultiOSLocalFManServiceHandler) copyFile(ctx context.Context, logger *l
 		return "", errors.New(NameAlreadyExistErrorMessage)
 	}
 	// Get source file reader to read its content.
-	srcFReadCloser, err := m.fileOps.ReadFile(srcFile.AbsPathOnDisk)
+	srcFReadCloser, err := m.fileOps.ReadFile(srcFile.RelPathOnDisk)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] ReadFile failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
 	}
+	defer srcFReadCloser.Close()
 
 	// Generate a new UUID for the destination file.
 	newFileUUID := m.uuidTool.NewUUID()
 	logger = logger.WithField("fileUUID", newFileUUID)
 	// Save the dst file to the disk.
-	relDstFilePath := filepath.Join(userUUID, fileUUID)
-	size, realPath, err := m.fileOps.SaveCloseFile(relDstFilePath, srcFReadCloser)
+	relDstPathOD := filepath.Join(userUUID, fileUUID)
+	size, err := m.fileOps.SaveFile(relDstPathOD, srcFReadCloser)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] SaveCloseFile failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] SaveFile failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
 	}
 	newFileMetadata := models.FileMetadata{
 		UUID:          newFileUUID,
 		Filename:      srcFile.Filename,
-		AbsPathOnDisk: realPath,
+		RelPathOnDisk: relDstPathOD,
 		ParentUUID:    dstParentDirUUID,
 		Size:          size,
-		OwnerUUID:     userUUID, // other user can copy the owner's file (if permited)
+		OwnerUUID:     userUUID, // other user can copy the owner's file (if permitted)
 	}
 	// Insert a new file metadata to the DB.
 	if err = m.localFManDBRepo.InsertFileMetadata(ctx, newFileMetadata); err != nil {
@@ -860,7 +857,7 @@ func (m *MultiOSLocalFManServiceHandler) copyFile(ctx context.Context, logger *l
 				logger.Errorf("[-INTERNAL-] RemoveFile failed with error %s", err.Error())
 			}
 		}()
-		logger.Errorf("[-INTERNAL-] InsertFileRecord failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] InsertFileMetadata failed with error %s", err.Error())
 		return "", errors.New(InternalErrorMessage)
 	}
 	return newFileUUID, nil
@@ -1007,14 +1004,13 @@ func (m *MultiOSLocalFManServiceHandler) DownloadFile(ctx context.Context, userU
 		logger.Errorf("[-INTERNAL-] GetFileMetadata failed with error %s", err.Error())
 		return models.FilePayload{}, errors.New(InternalErrorMessage)
 	}
-	fileRCloser, err := m.fileOps.ReadFile(srcFile.AbsPathOnDisk)
+	fileRCloser, err := m.fileOps.ReadFile(srcFile.RelPathOnDisk)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] ReadFile failed with error %s", err.Error())
 		return models.FilePayload{}, errors.New(InternalErrorMessage)
 	}
 	payload := models.FilePayload{
 		Filename:      srcFile.Filename,
-		ContentLength: srcFile.Size,
 		ReadCloser:    fileRCloser,
 	}
 	return payload, nil
@@ -1060,23 +1056,21 @@ func (m *MultiOSLocalFManServiceHandler) DownloadFileBatch(ctx context.Context, 
 	}
 	inZipPaths := make(map[string]string)
 	for _, srcFile := range srcFiles {
-		inZipPaths[srcFile.Filename] = srcFile.AbsPathOnDisk
+		inZipPaths[srcFile.Filename] = srcFile.RelPathOnDisk
 	}
-	tmpFile, err := m.fileCompress.CompressFiles(inZipPaths)
+	tmpFilePath, err := m.fileCompress.CompressFiles(inZipPaths)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] CompressFiles failed with error %s", err.Error())
 		return models.TmpFilePayload{}, errors.New(InternalErrorMessage)
 	}
-	// Get zipped file size
-	tmpFStat, err := tmpFile.Stat()
+	tmpFHanlder, err := m.fileOps.GetTmpFileHandler(tmpFilePath)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] Failed to read file stat %s", err.Error())
+		logger.Errorf("[-INTERNAL-] GetTmpFileHandler failed with error %s", err.Error())
 		return models.TmpFilePayload{}, errors.New(InternalErrorMessage)
 	}
 	payload := models.TmpFilePayload{
-		Filename:      tmpFile.Name(),
-		ContentLength: tmpFStat.Size(),
-		File:          tmpFile,
+		Filename:      filepath.Base(tmpFilePath),
+		TmpFile:       tmpFHanlder,
 	}
 	return payload, nil
 }

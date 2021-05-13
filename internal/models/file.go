@@ -1,8 +1,8 @@
 package models
 
 import (
+	fileUtils "github.com/nvthongswansea/xtreme/pkg/file-utils"
 	"io"
-	"os"
 	"time"
 )
 
@@ -26,8 +26,8 @@ type FileMetadata struct {
 	// Human-readable path of the file.
 	Path string `json:"path"`
 
-	// Real absolute path of the file, where it is logically stored.
-	AbsPathOnDisk string `json:"-"`
+	// Relative path of the file, where it is logically stored.
+	RelPathOnDisk string `json:"-"`
 
 	// Parent directory UUID.
 	ParentUUID string `json:"parent_uuid"`
@@ -57,7 +57,6 @@ type FileDescription struct {
 // FilePayload holds content reader of a file.
 type FilePayload struct {
 	Filename      string
-	ContentLength int64
 	ReadCloser    io.ReadCloser
 }
 
@@ -65,6 +64,5 @@ type FilePayload struct {
 // With *os.File, the temp file can be removed after use.
 type TmpFilePayload struct {
 	Filename      string
-	ContentLength int64
-	File          *os.File
+	TmpFile       fileUtils.TmpFileHandler
 }
