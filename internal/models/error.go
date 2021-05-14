@@ -2,19 +2,24 @@ package models
 
 import (
 	"fmt"
-	"time"
 )
 
 const (
 	InternalServerErrorMessage = "Oops! Something wrong happened in our server."
 )
 
-type FManError struct {
-	Code    int
-	Message string
-	ErrTime time.Time
+const (
+	InternalServerErrorCode = iota
+	BadInputErrorCode
+	ForbiddenOperationErrorCode
+	NotFoundErrorCode
+)
+
+type XtremeError struct {
+	Code    int `json:"-"`
+	Message string `json:"message"`
 }
 
-func (e FManError) Error() string {
-	return fmt.Sprintf("Error code: %d. Error message: %s. Time: %s", e.Code, e.Message, e.ErrTime.String())
+func (e XtremeError) Error() string {
+	return fmt.Sprintf("Error code: %d. Error message: %s.", e.Code, e.Message)
 }

@@ -44,7 +44,7 @@ type FileManager interface {
 	RenameFile(ctx context.Context, userUUID, fileUUID, newFileName string) error
 
 	// Move a file.
-	MoveFile(ctx context.Context, userUUID, fileUUID, dstParentDirUUID string) (string, error)
+	MoveFile(ctx context.Context, userUUID, fileUUID, dstParentDirUUID string) error
 
 	// Get a file.
 	GetFile(ctx context.Context, userUUID, fileUUID string) (models.File, error)

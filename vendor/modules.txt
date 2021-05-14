@@ -13,6 +13,9 @@ github.com/casbin/casbin/v2/persist/file-adapter
 github.com/casbin/casbin/v2/rbac
 github.com/casbin/casbin/v2/rbac/default-role-manager
 github.com/casbin/casbin/v2/util
+# github.com/dgrijalva/jwt-go v3.2.0+incompatible
+## explicit
+github.com/dgrijalva/jwt-go
 # github.com/google/uuid v1.2.0
 ## explicit
 github.com/google/uuid
@@ -34,10 +37,12 @@ github.com/sirupsen/logrus
 github.com/valyala/bytebufferpool
 # github.com/valyala/fasttemplate v1.2.1
 github.com/valyala/fasttemplate
-# golang.org/x/crypto v0.0.0-20210421142844-5bf0f12babf7
+# golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
 ## explicit
 golang.org/x/crypto/acme
 golang.org/x/crypto/acme/autocert
+golang.org/x/crypto/bcrypt
+golang.org/x/crypto/blowfish
 # golang.org/x/net v0.0.0-20210420210106-798c2154c571
 ## explicit
 golang.org/x/net/http/httpguts

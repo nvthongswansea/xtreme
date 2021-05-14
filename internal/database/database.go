@@ -72,7 +72,8 @@ type LocalFManRepository interface {
 	SearchByName(ctx context.Context, userUUID, filename, parentDirUUID string) ([]models.File, []models.Directory, error)
 }
 
-
+// UserRoleByEntityGetter defines user role getter methods w.r.t specific
+// file/directory.
 type UserRoleByEntityGetter interface {
 	// GetUserRoleByFile returns role of a user upon the given file.
 	// Current accepted roles: "owner", "editor", "viewer".
@@ -81,4 +82,21 @@ type UserRoleByEntityGetter interface {
 	// GetUserRoleByDirectory returns role of a user upon the given directory.
 	// Current accepted roles: "owner", "editor", "viewer".
 	GetUserRoleByDirectory(ctx context.Context, userUUID, dirUUID string) (string, error)
+}
+
+// UserCreateGetter defines create/get operations on user entity.
+type UserCreateGetter interface {
+	// CreateNewUser creates a new user based on given username and password hash.
+	// Returns a new user object, if success.
+	CreateNewUser(ctx context.Context, username, pswHash string) error
+
+	// GetUserByUsername get an user object based on given username.
+	// Returns a retrieved user object, if success.
+	GetUserByUsername(ctx context.Context, username string) (models.User, error)
+
+	// IsUsernameExist checks if the username exists.
+	IsUsernameExist(ctx context.Context, username string) (bool, error)
+
+	// IsUsernameUsernameExist checks if the (userUUID, username) exists.
+	IsUsernameUsernameExist(ctx context.Context, userUUID, username string) (bool, error)
 }

@@ -18,12 +18,12 @@ type UUIDGenerateValidator interface {
 type GoogleUUIDGenerator struct{}
 
 // NewUUID generates a new UUIDv4 (using google/uuid lib).
-func (g *GoogleUUIDGenerator) NewUUID() string {
+func (g GoogleUUIDGenerator) NewUUID() string {
 	return guuid.NewString()
 }
 
 // ValidateUUID validates a specific UUID (using google/uuid lib).
-func (g *GoogleUUIDGenerator) ValidateUUID(uuid string) bool {
+func (g GoogleUUIDGenerator) ValidateUUID(uuid string) bool {
 	_, err := guuid.Parse(uuid)
 	return err == nil
 }

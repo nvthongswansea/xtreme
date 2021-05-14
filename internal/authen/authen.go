@@ -1,6 +1,17 @@
 package authen
 
-import "context"
+import (
+	"context"
+	"github.com/dgrijalva/jwt-go"
+)
+
+// XtremeTokenClaims is custom jwt claims holding
+// UserUUID and username and standard claims.
+type XtremeTokenClaims struct {
+	UserUUID string `json:"user_uuid"`
+	Username string `json:"username"`
+	jwt.StandardClaims
+}
 
 // Authenticator holds operations on authenticate users.
 type Authenticator interface {
@@ -22,4 +33,7 @@ type Authenticator interface {
 	// - Internal server error happening when something is broken.
 	// - Authenticate error happens when username or password are incorrect.
 	Login(ctx context.Context, username, password string) (string, error)
+
+	// GetDataViaToken gets data (claims) from a specific token.
+	GetDataViaToken(ctx context.Context, token interface{}) (XtremeTokenClaims, error)
 }

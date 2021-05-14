@@ -3,20 +3,22 @@ package author
 import "context"
 
 type fileAction string
+
 const (
-	ViewFileAction fileAction = "view"
+	ViewFileAction   fileAction = "view"
 	UpdateFileAction fileAction = "update"
-	CopyFileAction fileAction = "copy"
+	CopyFileAction   fileAction = "copy"
 	RemoveFileAction fileAction = "remove"
 )
 
 type dirAction string
+
 const (
-	ViewDirAction dirAction = "view"
+	ViewDirAction     dirAction = "view"
 	UploadToDirAction dirAction = "uploadTo"
-	UpdateDirAction dirAction = "update"
-	CopyDirAction dirAction = "copy"
-	RemoveDirAction dirAction = "remove"
+	UpdateDirAction   dirAction = "update"
+	CopyDirAction     dirAction = "copy"
+	RemoveDirAction   dirAction = "remove"
 )
 
 // Authorizer holds operations on authorization.

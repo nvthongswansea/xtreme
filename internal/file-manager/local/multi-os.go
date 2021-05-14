@@ -3,7 +3,6 @@ package local
 import (
 	"bytes"
 	"context"
-	"errors"
 	"github.com/nvthongswansea/xtreme/internal/author"
 	"github.com/nvthongswansea/xtreme/internal/database"
 	"github.com/nvthongswansea/xtreme/internal/models"
@@ -16,58 +15,62 @@ import (
 )
 
 const (
-	InvalidDirNameErrorMessage       = "directory name is invalid"
-	InvalidFileNameErrorMessage      = "filename is invalid"
-	InvalidUserUUIDErrorMessage      = "user UUID is not valid"
-	InvalidParentDirUUIDErrorMessage = "parent directory UUID is not valid"
-	InvalidFileUUIDErrorMessage      = "file UUID is not valid"
-	InvalidDirUUIDErrorMessage       = "file UUID is not valid"
-	InvalidPathErrorMessage          = "path is not valid"
+	invalidDirNameErrorMessage       = "directory name is invalid"
+	invalidFileNameErrorMessage      = "filename is invalid"
+	invalidUserUUIDErrorMessage      = "user UUID is not valid"
+	invalidParentDirUUIDErrorMessage = "parent directory UUID is not valid"
+	invalidFileUUIDErrorMessage      = "file UUID is not valid"
+	invalidDirUUIDErrorMessage       = "file UUID is not valid"
+	invalidPathErrorMessage          = "path is not valid"
 
-	PathNotFoundMessage = "path not found"
-	NameAlreadyExistErrorMessage            = "name already exists in desired location"
-	ForbiddenOperationErrorMessage = "forbidden operation"
-
-	InternalErrorMessage = "internal error"
+	pathNotFoundMessage            = "path not found"
+	nameAlreadyExistErrorMessage   = "name already exists in desired location"
+	forbiddenOperationErrorMessage = "forbidden operation"
 )
 
-// MultiOSLocalFManServiceHandler implements interface LocalFManServiceHandler.
-// This implementation of LocalFManServiceHandler support multiple Operating Systems.
-type MultiOSLocalFManServiceHandler struct {
+// MultiOSFileManager implements interface local.FileManager.
+// This implementation of local.FileManager supports multiple Operating Systems.
+type MultiOSFileManager struct {
 	localFManDBRepo database.LocalFManRepository
 	uuidTool        uuidUtils.UUIDGenerateValidator
 	fileOps         fileUtils.FileSaveReadCpRmer
 	fileCompress    fileUtils.FileCompressor
-	author author.Authorizer
+	author          author.Authorizer
 }
 
-func (m *MultiOSLocalFManServiceHandler) GetRootDirectory(ctx context.Context, userUUID string) (models.Directory, error) {
+func (m *MultiOSFileManager) GetRootDirectory(ctx context.Context, userUUID string) (models.Directory, error) {
 	// Init logger header
 	logger := log.WithFields(log.Fields{
-		"Loc":         "local-service_handler-multi_os",
-		"Operation":   "GetRootDirectory",
-		"userUUID":    userUUID,
+		"Loc":       "local-service_handler-multi_os",
+		"Operation": "GetRootDirectory",
+		"userUUID":  userUUID,
 	})
 	logger.Debug("Start retrieving root directory")
 	defer logger.Debug("Finish retrieving root directory")
 	// Pre-validate inputs
 	if !m.uuidTool.ValidateUUID(userUUID) {
-		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
-		return models.Directory{}, errors.New(InvalidUserUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidUserUUIDErrorMessage)
+		return models.Directory{}, models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidUserUUIDErrorMessage,
+		}
 	}
 	// No need to authorize.
 	rooDir, err := m.localFManDBRepo.GetRootDirectory(ctx, userUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetRootDirectory failed with error %s", err.Error())
-		return models.Directory{}, err
+		return models.Directory{}, models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	return rooDir, nil
 }
 
-// NewMultiOSLocalFManServiceHandler creates a new MultiOSLocalFManServiceHandler.
-func NewMultiOSLocalFManServiceHandler(localFManDBRepo database.LocalFManRepository, uuidTool uuidUtils.UUIDGenerateValidator,
-	fileOps fileUtils.FileSaveReadCpRmer, fileCompress fileUtils.FileCompressor, author author.Authorizer) *MultiOSLocalFManServiceHandler {
-	return &MultiOSLocalFManServiceHandler{
+// NewMultiOSFileManager creates a new MultiOSFileManager.
+func NewMultiOSFileManager(localFManDBRepo database.LocalFManRepository, uuidTool uuidUtils.UUIDGenerateValidator,
+	fileOps fileUtils.FileSaveReadCpRmer, fileCompress fileUtils.FileCompressor, author author.Authorizer) *MultiOSFileManager {
+	return &MultiOSFileManager{
 		localFManDBRepo,
 		uuidTool,
 		fileOps,
@@ -75,7 +78,7 @@ func NewMultiOSLocalFManServiceHandler(localFManDBRepo database.LocalFManReposit
 		author,
 	}
 }
-func (m *MultiOSLocalFManServiceHandler) RenameFile(ctx context.Context, userUUID, fileUUID, newFileName string) error {
+func (m *MultiOSFileManager) RenameFile(ctx context.Context, userUUID, fileUUID, newFileName string) error {
 	// Init logger header
 	logger := log.WithFields(log.Fields{
 		"Loc":         "local-service_handler-multi_os",
@@ -88,54 +91,81 @@ func (m *MultiOSLocalFManServiceHandler) RenameFile(ctx context.Context, userUUI
 	defer logger.Debug("Finish renaming file")
 	// Pre-validate inputs
 	if !m.uuidTool.ValidateUUID(userUUID) {
-		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
-		return errors.New(InvalidUserUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidUserUUIDErrorMessage)
+		return models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidUserUUIDErrorMessage,
+		}
 	}
 	if !m.uuidTool.ValidateUUID(fileUUID) {
-		logger.Info("[-USER-]", InvalidFileUUIDErrorMessage)
-		return errors.New(InvalidFileUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidFileUUIDErrorMessage)
+		return models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidFileUUIDErrorMessage,
+		}
 	}
 	if !fileUtils.IsFilenameOk(newFileName) {
-		logger.Info("[-USER-]", InvalidFileNameErrorMessage)
-		return errors.New(InvalidFileNameErrorMessage)
+		logger.Info("[-USER-]", invalidFileNameErrorMessage)
+		return models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidFileNameErrorMessage,
+		}
 	}
 	// Authorization.
 	isAuthorized, err := m.author.AuthorizeActionsOnFile(ctx, userUUID, fileUUID, author.UpdateFileAction)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnFile failed with error %s", err.Error())
-		return errors.New(InternalErrorMessage)
+		return models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	if !isAuthorized {
-		logger.Info(ForbiddenOperationErrorMessage)
-		return errors.New(ForbiddenOperationErrorMessage)
+		logger.Info(forbiddenOperationErrorMessage)
+		return models.XtremeError{
+			Code:    models.ForbiddenOperationErrorCode,
+			Message: forbiddenOperationErrorMessage,
+		}
 	}
 
 	// Get the source file metadata.
 	srcFile, err := m.localFManDBRepo.GetFileMetadata(ctx, fileUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetFileMetadata failed with error %s", err.Error())
-		return errors.New(InternalErrorMessage)
+		return models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	// Check if the file already exists in a current location in the db.
 	isExist, err := m.localFManDBRepo.IsNameExist(ctx, newFileName, srcFile.ParentUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsNameExist failed with error %s", err.Error())
-		return errors.New(InternalErrorMessage)
+		return models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	if isExist {
 		logger.Infof("[-USER-] %s already exists in the desired location", newFileName)
-		return errors.New(NameAlreadyExistErrorMessage)
+		return models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: nameAlreadyExistErrorMessage,
+		}
 	}
 	srcFile.Filename = newFileName
 	err = m.localFManDBRepo.UpdateFileMetadata(ctx, srcFile)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] UpdateFileMetadata failed with error %s", err.Error())
-		return errors.New(InternalErrorMessage)
+		return models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	return nil
 }
 
-func (m *MultiOSLocalFManServiceHandler) SoftRemoveFile(ctx context.Context, userUUID, fileUUID string) error {
+func (m *MultiOSFileManager) SoftRemoveFile(ctx context.Context, userUUID, fileUUID string) error {
 	// Init logger header
 	logger := log.WithFields(log.Fields{
 		"Loc":       "local-service_handler-multi_os",
@@ -147,33 +177,48 @@ func (m *MultiOSLocalFManServiceHandler) SoftRemoveFile(ctx context.Context, use
 	defer logger.Debug("Finish removing file (SOFT)")
 	// Pre-validate inputs
 	if !m.uuidTool.ValidateUUID(userUUID) {
-		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
-		return errors.New(InvalidUserUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidUserUUIDErrorMessage)
+		return models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidUserUUIDErrorMessage,
+		}
 	}
 	if !m.uuidTool.ValidateUUID(fileUUID) {
-		logger.Info("[-USER-]", InvalidFileUUIDErrorMessage)
-		return errors.New(InvalidFileUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidFileUUIDErrorMessage)
+		return models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidFileUUIDErrorMessage,
+		}
 	}
 	// Authorization.
 	isAuthorized, err := m.author.AuthorizeActionsOnFile(ctx, userUUID, fileUUID, author.RemoveFileAction)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnFile failed with error %s", err.Error())
-		return errors.New(InternalErrorMessage)
+		return models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	if !isAuthorized {
-		logger.Info(ForbiddenOperationErrorMessage)
-		return errors.New(ForbiddenOperationErrorMessage)
+		logger.Info(forbiddenOperationErrorMessage)
+		return models.XtremeError{
+			Code:    models.ForbiddenOperationErrorCode,
+			Message: forbiddenOperationErrorMessage,
+		}
 	}
 
 	err = m.localFManDBRepo.SoftRemoveFile(ctx, fileUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] SoftRemoveFile failed with error %s", err.Error())
-		return errors.New(InternalErrorMessage)
+		return models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	return nil
 }
 
-func (m *MultiOSLocalFManServiceHandler) HardRemoveFile(ctx context.Context, userUUID, fileUUID string) error {
+func (m *MultiOSFileManager) HardRemoveFile(ctx context.Context, userUUID, fileUUID string) error {
 	// Init logger header
 	logger := log.WithFields(log.Fields{
 		"Loc":       "local-service_handler-multi_os",
@@ -184,33 +229,48 @@ func (m *MultiOSLocalFManServiceHandler) HardRemoveFile(ctx context.Context, use
 	logger.Debug("Start removing file (HARD)")
 	defer logger.Debug("Finish removing file (HARD)")
 	if !m.uuidTool.ValidateUUID(userUUID) {
-		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
-		return errors.New(InvalidUserUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidUserUUIDErrorMessage)
+		return models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidUserUUIDErrorMessage,
+		}
 	}
 	if !m.uuidTool.ValidateUUID(fileUUID) {
-		logger.Info("[-USER-]", InvalidFileUUIDErrorMessage)
-		return errors.New(InvalidFileUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidFileUUIDErrorMessage)
+		return models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidFileUUIDErrorMessage,
+		}
 	}
 	// Authorization.
 	isAuthorized, err := m.author.AuthorizeActionsOnFile(ctx, userUUID, fileUUID, author.RemoveFileAction)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnFile failed with error %s", err.Error())
-		return errors.New(InternalErrorMessage)
+		return models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	if !isAuthorized {
-		logger.Info(ForbiddenOperationErrorMessage)
-		return errors.New(ForbiddenOperationErrorMessage)
+		logger.Info(forbiddenOperationErrorMessage)
+		return models.XtremeError{
+			Code:    models.ForbiddenOperationErrorCode,
+			Message: forbiddenOperationErrorMessage,
+		}
 	}
 
 	err = m.localFManDBRepo.HardRemoveFile(ctx, fileUUID, m.fileOps.RemoveFile)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] HardRemoveFile failed with error %s", err.Error())
-		return errors.New(InternalErrorMessage)
+		return models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	return nil
 }
 
-func (m *MultiOSLocalFManServiceHandler) GetDirectory(ctx context.Context, userUUID, dirUUID string) (models.Directory, error) {
+func (m *MultiOSFileManager) GetDirectory(ctx context.Context, userUUID, dirUUID string) (models.Directory, error) {
 	// Init logger header
 	logger := log.WithFields(log.Fields{
 		"Loc":       "local-service_handler-multi_os",
@@ -221,33 +281,48 @@ func (m *MultiOSLocalFManServiceHandler) GetDirectory(ctx context.Context, userU
 	logger.Debug("Start getting directory")
 	defer logger.Debug("Finish getting directory")
 	if !m.uuidTool.ValidateUUID(userUUID) {
-		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
-		return models.Directory{}, errors.New(InvalidUserUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidUserUUIDErrorMessage)
+		return models.Directory{}, models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidUserUUIDErrorMessage,
+		}
 	}
 	if !m.uuidTool.ValidateUUID(dirUUID) {
-		logger.Info("[-USER-]", InvalidDirUUIDErrorMessage)
-		return models.Directory{}, errors.New(InvalidDirUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidDirUUIDErrorMessage)
+		return models.Directory{}, models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidDirUUIDErrorMessage,
+		}
 	}
 	// Authorization.
 	isAuthorized, err := m.author.AuthorizeActionsOnDir(ctx, userUUID, dirUUID, author.ViewDirAction)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
-		return models.Directory{},errors.New(InternalErrorMessage)
+		return models.Directory{}, models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	if !isAuthorized {
-		logger.Info(ForbiddenOperationErrorMessage)
-		return models.Directory{}, errors.New(ForbiddenOperationErrorMessage)
+		logger.Info(forbiddenOperationErrorMessage)
+		return models.Directory{}, models.XtremeError{
+			Code:    models.ForbiddenOperationErrorCode,
+			Message: forbiddenOperationErrorMessage,
+		}
 	}
 
 	directory, err := m.localFManDBRepo.GetDirectory(ctx, dirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetDirMetadata failed with error %s", err.Error())
-		return models.Directory{}, errors.New(InternalErrorMessage)
+		return models.Directory{}, models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	return directory, nil
 }
 
-func (m *MultiOSLocalFManServiceHandler) CopyDirectory(ctx context.Context, userUUID, dirUUID, dstParentDirUUID string) (string, error) {
+func (m *MultiOSFileManager) CopyDirectory(ctx context.Context, userUUID, dirUUID, dstParentDirUUID string) (string, error) {
 	logger := log.WithFields(log.Fields{
 		"Loc":              "local-service_handler-multi_os",
 		"Operation":        "CopyDirectory",
@@ -259,56 +334,83 @@ func (m *MultiOSLocalFManServiceHandler) CopyDirectory(ctx context.Context, user
 	defer logger.Debug("Finish moving directory")
 	// Pre-validate inputs
 	if !m.uuidTool.ValidateUUID(userUUID) {
-		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
-		return "", errors.New(InvalidUserUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidUserUUIDErrorMessage)
+		return "", models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidUserUUIDErrorMessage,
+		}
 	}
 	if !m.uuidTool.ValidateUUID(dirUUID) {
-		logger.Info("[-USER-]", InvalidDirUUIDErrorMessage)
-		return "", errors.New(InvalidDirUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidDirUUIDErrorMessage)
+		return "", models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidDirUUIDErrorMessage,
+		}
 	}
 	if !m.uuidTool.ValidateUUID(dstParentDirUUID) {
-		logger.Info("[-USER-]", InvalidDirUUIDErrorMessage)
-		return "", errors.New(InvalidDirUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidDirUUIDErrorMessage)
+		return "", models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidDirUUIDErrorMessage,
+		}
 	}
 	// Authorization.
 	isAuthorized, err := m.author.AuthorizeActionsOnDir(ctx, userUUID, dirUUID, author.CopyDirAction)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	if !isAuthorized {
-		logger.Info(ForbiddenOperationErrorMessage)
-		return "", errors.New(ForbiddenOperationErrorMessage)
+		logger.Info(forbiddenOperationErrorMessage)
+		return "", models.XtremeError{
+			Code:    models.ForbiddenOperationErrorCode,
+			Message: forbiddenOperationErrorMessage,
+		}
 	}
 	return m.copyDirectory(ctx, logger, userUUID, dirUUID, dstParentDirUUID)
 }
 
-func (m *MultiOSLocalFManServiceHandler) copyDirectory(ctx context.Context, logger *log.Entry, userUUID, dirUUID, dstParentDirUUID string) (string, error) {
+func (m *MultiOSFileManager) copyDirectory(ctx context.Context, logger *log.Entry, userUUID, dirUUID, dstParentDirUUID string) (string, error) {
 	// Get to-be-copied dir metadata.
 	copiedDirMeta, err := m.localFManDBRepo.GetDirMetadata(ctx, dirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetDirMetadata failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	logger.WithField("currentCopyPath", copiedDirMeta.Path)
 	// Copy the current dir to the new location
 	nDirCopyUUID, err := m.createNewDirectory(ctx, logger, userUUID, copiedDirMeta.Dirname, dstParentDirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] createNewDirectory failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 
 	// Copy files to the newly created directory.
 	childFileMetaList, err := m.localFManDBRepo.GetChildFileMetadataList(ctx, dirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetChildFileMetadataList failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	for _, childMeta := range childFileMetaList {
 		_, err := m.copyFile(ctx, logger, userUUID, childMeta.UUID, nDirCopyUUID)
 		if err != nil {
 			logger.Errorf("[-INTERNAL-] copyFile failed with error %s", err.Error())
-			return "", errors.New(InternalErrorMessage)
+			return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 		}
 	}
 
@@ -316,20 +418,26 @@ func (m *MultiOSLocalFManServiceHandler) copyDirectory(ctx context.Context, logg
 	dChildDirUUIDList, err := m.localFManDBRepo.GetDirectChildDirUUIDList(ctx, dirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetDirectChildDirUUIDList failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	for _, childDirUUID := range dChildDirUUIDList {
 		// Recursively copy the child directories with their child files/directories.
 		_, err := m.copyDirectory(ctx, logger, userUUID, childDirUUID, nDirCopyUUID)
 		if err != nil {
 			logger.Errorf("[-INTERNAL-] copyDirectory failed with error %s", err.Error())
-			return "", errors.New(InternalErrorMessage)
+			return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 		}
 	}
 	return nDirCopyUUID, nil
 }
 
-func (m *MultiOSLocalFManServiceHandler) RenameDirectory(ctx context.Context, userUUID, dirUUID, newDirName string) error {
+func (m *MultiOSFileManager) RenameDirectory(ctx context.Context, userUUID, dirUUID, newDirName string) error {
 	// Init logger header
 	logger := log.WithFields(log.Fields{
 		"Loc":        "local-service_handler-multi_os",
@@ -342,58 +450,88 @@ func (m *MultiOSLocalFManServiceHandler) RenameDirectory(ctx context.Context, us
 	defer logger.Debug("Finish renaming directory")
 	// Pre-validate inputs
 	if !m.uuidTool.ValidateUUID(userUUID) {
-		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
-		return errors.New(InvalidUserUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidUserUUIDErrorMessage)
+		return models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidUserUUIDErrorMessage,
+		}
 	}
 	if !m.uuidTool.ValidateUUID(dirUUID) {
-		logger.Info("[-USER-]", InvalidDirUUIDErrorMessage)
-		return errors.New(InvalidDirUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidDirUUIDErrorMessage)
+		return models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidDirUUIDErrorMessage,
+		}
 	}
 	if !fileUtils.IsFilenameOk(newDirName) {
-		logger.Info("[-USER-]", InvalidFileNameErrorMessage)
-		return errors.New(InvalidFileNameErrorMessage)
+		logger.Info("[-USER-]", invalidFileNameErrorMessage)
+		return models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidFileNameErrorMessage,
+		}
 	}
 	// Authorization.
 	isAuthorized, err := m.author.AuthorizeActionsOnDir(ctx, userUUID, dirUUID, author.UpdateDirAction)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
-		return errors.New(InternalErrorMessage)
+		return models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	if !isAuthorized {
-		logger.Info(ForbiddenOperationErrorMessage)
-		return errors.New(ForbiddenOperationErrorMessage)
+		logger.Info(forbiddenOperationErrorMessage)
+		return models.XtremeError{
+			Code:    models.ForbiddenOperationErrorCode,
+			Message: forbiddenOperationErrorMessage,
+		}
 	}
 
 	// Get the source directory metadata.
 	dirMeta, err := m.localFManDBRepo.GetDirMetadata(ctx, dirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetDirMetadata failed with error %s", err.Error())
-		return errors.New(InternalErrorMessage)
+		return models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	if (dirMeta == models.DirectoryMetadata{}) {
 		logger.Infof("[-USER-] directory UUID (%s) does not exist", dirUUID)
-		return errors.New(InvalidDirUUIDErrorMessage)
+		return models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidDirUUIDErrorMessage,
+		}
 	}
 	// Check if the name already exists in a current location in the db.
 	isExist, err := m.localFManDBRepo.IsNameExist(ctx, newDirName, dirMeta.ParentUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsNameExist failed with error %s", err.Error())
-		return errors.New(InternalErrorMessage)
+		return models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	if isExist {
 		logger.Infof("[-USER-] %s already exists in the desired location", newDirName)
-		return errors.New(NameAlreadyExistErrorMessage)
+		return models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: nameAlreadyExistErrorMessage,
+		}
 	}
 	dirMeta.Dirname = newDirName
 	err = m.localFManDBRepo.UpdateDirMetadata(ctx, dirMeta)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] UpdateDirMetadata failed with error %s", err.Error())
-		return errors.New(InternalErrorMessage)
+		return models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	return nil
 }
 
-func (m *MultiOSLocalFManServiceHandler) MoveDirectory(ctx context.Context, userUUID, dirUUID, dstParentDirUUID string) (string, error) {
+func (m *MultiOSFileManager) MoveDirectory(ctx context.Context, userUUID, dirUUID, dstParentDirUUID string) (string, error) {
 	logger := log.WithFields(log.Fields{
 		"Loc":              "local-service_handler-multi_os",
 		"Operation":        "MoveDirectory",
@@ -405,54 +543,81 @@ func (m *MultiOSLocalFManServiceHandler) MoveDirectory(ctx context.Context, user
 	defer logger.Debug("Finish moving directory")
 	// Pre-validate inputs
 	if !m.uuidTool.ValidateUUID(userUUID) {
-		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
-		return "", errors.New(InvalidUserUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidUserUUIDErrorMessage)
+		return "", models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidUserUUIDErrorMessage,
+		}
 	}
 	if !m.uuidTool.ValidateUUID(dirUUID) {
-		logger.Info("[-USER-]", InvalidDirUUIDErrorMessage)
-		return "", errors.New(InvalidDirUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidDirUUIDErrorMessage)
+		return "", models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidDirUUIDErrorMessage,
+		}
 	}
 	if !m.uuidTool.ValidateUUID(dstParentDirUUID) {
-		logger.Info("[-USER-]", InvalidDirUUIDErrorMessage)
-		return "", errors.New(InvalidDirUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidDirUUIDErrorMessage)
+		return "", models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidDirUUIDErrorMessage,
+		}
 	}
 	// Authorization.
 	isAuthorized, err := m.author.AuthorizeActionsOnDir(ctx, userUUID, dirUUID, author.CopyDirAction, author.RemoveDirAction)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	if !isAuthorized {
-		logger.Info(ForbiddenOperationErrorMessage)
-		return "", errors.New(ForbiddenOperationErrorMessage)
+		logger.Info(forbiddenOperationErrorMessage)
+		return "", models.XtremeError{
+			Code:    models.ForbiddenOperationErrorCode,
+			Message: forbiddenOperationErrorMessage,
+		}
 	}
 
 	// Get the directory metadata.
 	dirMeta, err := m.localFManDBRepo.GetDirMetadata(ctx, dirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetDirMetadata failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	// Check if the directory name already exists in a desired location in the db.
 	isExist, err := m.localFManDBRepo.IsNameExist(ctx, dirMeta.Dirname, dstParentDirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsNameExist failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	if isExist {
 		logger.Infof("[-USER-] %s already exists in the desired location", dirMeta.Dirname)
-		return "", errors.New(NameAlreadyExistErrorMessage)
+		return "", models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: nameAlreadyExistErrorMessage,
+		}
 	}
 	dirMeta.ParentUUID = dstParentDirUUID
 	err = m.localFManDBRepo.UpdateDirMetadata(ctx, dirMeta)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] UpdateDirMetadata failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	return dirUUID, nil
 }
 
-func (m *MultiOSLocalFManServiceHandler) DownloadDirectory(ctx context.Context, userUUID, dirUUID string) (models.TmpFilePayload, error) {
+func (m *MultiOSFileManager) DownloadDirectory(ctx context.Context, userUUID, dirUUID string) (models.TmpFilePayload, error) {
 	// Init logger header
 	logger := log.WithFields(log.Fields{
 		"Loc":       "local-service_handler-multi_os",
@@ -463,36 +628,54 @@ func (m *MultiOSLocalFManServiceHandler) DownloadDirectory(ctx context.Context, 
 	logger.Debug("Start getting directory")
 	defer logger.Debug("Finish getting directory")
 	if !m.uuidTool.ValidateUUID(userUUID) {
-		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
-		return models.TmpFilePayload{}, errors.New(InvalidUserUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidUserUUIDErrorMessage)
+		return models.TmpFilePayload{}, models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidUserUUIDErrorMessage,
+		}
 	}
 	if !m.uuidTool.ValidateUUID(dirUUID) {
-		logger.Info("[-USER-]", InvalidDirUUIDErrorMessage)
-		return models.TmpFilePayload{}, errors.New(InvalidDirUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidDirUUIDErrorMessage)
+		return models.TmpFilePayload{}, models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidDirUUIDErrorMessage,
+		}
 	}
 	// Authorization.
 	isAuthorized, err := m.author.AuthorizeActionsOnDir(ctx, userUUID, dirUUID, author.ViewDirAction)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
-		return models.TmpFilePayload{},errors.New(InternalErrorMessage)
+		return models.TmpFilePayload{}, models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	if !isAuthorized {
-		logger.Info(ForbiddenOperationErrorMessage)
-		return models.TmpFilePayload{}, errors.New(ForbiddenOperationErrorMessage)
+		logger.Info(forbiddenOperationErrorMessage)
+		return models.TmpFilePayload{}, models.XtremeError{
+			Code:    models.ForbiddenOperationErrorCode,
+			Message: forbiddenOperationErrorMessage,
+		}
 	}
 
 	// Get dir metadata.
 	dirMeta, err := m.localFManDBRepo.GetDirMetadata(ctx, dirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetDirMetadata failed with error %s", err.Error())
-		return models.TmpFilePayload{}, errors.New(InternalErrorMessage)
+		return models.TmpFilePayload{}, models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 
 	// Get all child-files metadata.
 	fileMetadataList, err := m.localFManDBRepo.GetChildFileMetadataList(ctx, dirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetChildFileMetadataList failed with error %s", err.Error())
-		return models.TmpFilePayload{}, errors.New(InternalErrorMessage)
+		return models.TmpFilePayload{}, models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 
 	inZipPaths := make(map[string]string)
@@ -500,28 +683,37 @@ func (m *MultiOSLocalFManServiceHandler) DownloadDirectory(ctx context.Context, 
 		relPath, err := filepath.Rel(dirMeta.Path, childFileMeta.Path)
 		if err != nil {
 			logger.Errorf("[-INTERNAL-] filepath.Rel failed with error %s", err.Error())
-			return models.TmpFilePayload{}, errors.New(InternalErrorMessage)
+			return models.TmpFilePayload{}, models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 		}
 		inZipPaths[relPath] = childFileMeta.RelPathOnDisk
 	}
 	tmpFilePath, err := m.fileCompress.CompressFiles(inZipPaths)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] CompressFiles failed with error %s", err.Error())
-		return models.TmpFilePayload{}, errors.New(InternalErrorMessage)
+		return models.TmpFilePayload{}, models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	tmpFHanlder, err := m.fileOps.GetTmpFileHandler(tmpFilePath)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetTmpFileHandler failed with error %s", err.Error())
-		return models.TmpFilePayload{}, errors.New(InternalErrorMessage)
+		return models.TmpFilePayload{}, models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	payload := models.TmpFilePayload{
-		Filename:      filepath.Base(tmpFilePath),
-		TmpFile:       tmpFHanlder,
+		Filename: filepath.Base(tmpFilePath),
+		TmpFile:  tmpFHanlder,
 	}
 	return payload, nil
 }
 
-func (m *MultiOSLocalFManServiceHandler) SoftRemoveDir(ctx context.Context, userUUID, dirUUID string) error {
+func (m *MultiOSFileManager) SoftRemoveDir(ctx context.Context, userUUID, dirUUID string) error {
 	// Init logger header
 	logger := log.WithFields(log.Fields{
 		"Loc":       "local-service_handler-multi_os",
@@ -533,33 +725,48 @@ func (m *MultiOSLocalFManServiceHandler) SoftRemoveDir(ctx context.Context, user
 	defer logger.Debug("Finish removing directory (SOFT)")
 	// Pre-validate inputs
 	if !m.uuidTool.ValidateUUID(userUUID) {
-		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
-		return errors.New(InvalidUserUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidUserUUIDErrorMessage)
+		return models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidUserUUIDErrorMessage,
+		}
 	}
 	if !m.uuidTool.ValidateUUID(dirUUID) {
-		logger.Info("[-USER-]", InvalidDirUUIDErrorMessage)
-		return errors.New(InvalidDirUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidDirUUIDErrorMessage)
+		return models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidDirUUIDErrorMessage,
+		}
 	}
 	// Authorization.
 	isAuthorized, err := m.author.AuthorizeActionsOnDir(ctx, userUUID, dirUUID, author.RemoveDirAction)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
-		return errors.New(InternalErrorMessage)
+		return models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	if !isAuthorized {
-		logger.Info(ForbiddenOperationErrorMessage)
-		return errors.New(ForbiddenOperationErrorMessage)
+		logger.Info(forbiddenOperationErrorMessage)
+		return models.XtremeError{
+			Code:    models.ForbiddenOperationErrorCode,
+			Message: forbiddenOperationErrorMessage,
+		}
 	}
 
 	err = m.localFManDBRepo.SoftRemoveDir(ctx, dirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] SoftRemoveFile failed with error %s", err.Error())
-		return errors.New(InternalErrorMessage)
+		return models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	return nil
 }
 
-func (m *MultiOSLocalFManServiceHandler) HardRemoveDir(ctx context.Context, userUUID, dirUUID string) error {
+func (m *MultiOSFileManager) HardRemoveDir(ctx context.Context, userUUID, dirUUID string) error {
 	// Init logger header
 	logger := log.WithFields(log.Fields{
 		"Loc":       "local-service_handler-multi_os",
@@ -571,33 +778,48 @@ func (m *MultiOSLocalFManServiceHandler) HardRemoveDir(ctx context.Context, user
 	defer logger.Debug("Finish removing directory (HARD)")
 	// Pre-validate inputs
 	if !m.uuidTool.ValidateUUID(userUUID) {
-		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
-		return errors.New(InvalidUserUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidUserUUIDErrorMessage)
+		return models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidUserUUIDErrorMessage,
+		}
 	}
 	if !m.uuidTool.ValidateUUID(dirUUID) {
-		logger.Info("[-USER-]", InvalidDirUUIDErrorMessage)
-		return errors.New(InvalidDirUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidDirUUIDErrorMessage)
+		return models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidDirUUIDErrorMessage,
+		}
 	}
 	// Authorization.
 	isAuthorized, err := m.author.AuthorizeActionsOnDir(ctx, userUUID, dirUUID, author.RemoveDirAction)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
-		return errors.New(InternalErrorMessage)
+		return models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	if !isAuthorized {
-		logger.Info(ForbiddenOperationErrorMessage)
-		return errors.New(ForbiddenOperationErrorMessage)
+		logger.Info(forbiddenOperationErrorMessage)
+		return models.XtremeError{
+			Code:    models.ForbiddenOperationErrorCode,
+			Message: forbiddenOperationErrorMessage,
+		}
 	}
 
 	err = m.localFManDBRepo.HardRemoveDir(ctx, dirUUID, m.fileOps.RemoveFile)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] SoftRemoveFile failed with error %s", err.Error())
-		return errors.New(InternalErrorMessage)
+		return models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	return nil
 }
 
-func (m *MultiOSLocalFManServiceHandler) GetUUIDByPath(ctx context.Context, userUUID, path string) (string, error) {
+func (m *MultiOSFileManager) GetUUIDByPath(ctx context.Context, userUUID, path string) (string, error) {
 	// Init logger header
 	logger := log.WithFields(log.Fields{
 		"Loc":       "local-service_handler-multi_os",
@@ -609,29 +831,44 @@ func (m *MultiOSLocalFManServiceHandler) GetUUIDByPath(ctx context.Context, user
 	defer logger.Debug("Finish retrieving UUID via path")
 	// Pre-validate inputs
 	if !m.uuidTool.ValidateUUID(userUUID) {
-		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
-		return "", errors.New(InvalidUserUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidUserUUIDErrorMessage)
+		return "", models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidUserUUIDErrorMessage,
+		}
 	}
 	path = filepath.Clean(path)
 	if path == "" {
-		logger.Info("[-USER-]", InvalidPathErrorMessage)
-		return "", errors.New(InvalidPathErrorMessage)
+		logger.Info("[-USER-]", invalidPathErrorMessage)
+		return "", models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidPathErrorMessage,
+		}
 	}
 	// Get root dir metadata of the user
 	rootDirMeta, err := m.localFManDBRepo.GetRootDirMetadata(ctx, userUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetUUIDByPath failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 
 	uuid, isDir, err := m.localFManDBRepo.GetUUIDByPath(ctx, rootDirMeta.UUID, path)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetUUIDByPath failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	if uuid == "" {
-		logger.Info("[-USER-]", PathNotFoundMessage)
-		return "", errors.New(PathNotFoundMessage)
+		logger.Info("[-USER-]", pathNotFoundMessage)
+		return "", models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: pathNotFoundMessage,
+		}
 	}
 	// Authorization. Note: Since we only
 	// know if the user has permission to view this UUID
@@ -641,28 +878,40 @@ func (m *MultiOSLocalFManServiceHandler) GetUUIDByPath(ctx context.Context, user
 		isAuthorized, err := m.author.AuthorizeActionsOnDir(ctx, userUUID, uuid, author.ViewDirAction)
 		if err != nil {
 			logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
-			return "", errors.New(InternalErrorMessage)
+			return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 		}
 		if !isAuthorized {
-			logger.Info(ForbiddenOperationErrorMessage)
-			return "", errors.New(ForbiddenOperationErrorMessage)
+			logger.Info(forbiddenOperationErrorMessage)
+			return "", models.XtremeError{
+			Code:    models.ForbiddenOperationErrorCode,
+			Message: forbiddenOperationErrorMessage,
+		}
 		}
 		return uuid, nil
 	}
 	isAuthorized, err := m.author.AuthorizeActionsOnFile(ctx, userUUID, uuid, author.ViewFileAction)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnFile failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	if !isAuthorized {
-		logger.Info(ForbiddenOperationErrorMessage)
-		return "", errors.New(ForbiddenOperationErrorMessage)
+		logger.Info(forbiddenOperationErrorMessage)
+		return "", models.XtremeError{
+			Code:    models.ForbiddenOperationErrorCode,
+			Message: forbiddenOperationErrorMessage,
+		}
 	}
 	return uuid, nil
 }
 
 // CreateNewFile creates a new empty file with a given filename in a specific user storage space.
-func (m *MultiOSLocalFManServiceHandler) CreateNewFile(ctx context.Context, userUUID, filename, parentDirUUID string) (string, error) {
+func (m *MultiOSFileManager) CreateNewFile(ctx context.Context, userUUID, filename, parentDirUUID string) (string, error) {
 	// Init logger header
 	logger := log.WithFields(log.Fields{
 		"Loc":           "local-service_handler-multi_os",
@@ -674,12 +923,12 @@ func (m *MultiOSLocalFManServiceHandler) CreateNewFile(ctx context.Context, user
 	logger.Debug("Start creating a new file")
 	defer logger.Debug("Finish creating a new file")
 	emptyBytes := make([]byte, 0) // Create an empty byte slice
-	// Create a new ReadCloser
+	// Create a new Reader
 	contentReadCloser := ioutil.NopCloser(bytes.NewReader(emptyBytes))
 	return m.UploadFile(ctx, userUUID, filename, parentDirUUID, contentReadCloser)
 }
 
-func (m *MultiOSLocalFManServiceHandler) UploadFile(ctx context.Context, userUUID, filename, parentDirUUID string, contentReader io.Reader) (string, error) {
+func (m *MultiOSFileManager) UploadFile(ctx context.Context, userUUID, filename, parentDirUUID string, contentReader io.Reader) (string, error) {
 	logger := log.WithFields(log.Fields{
 		"Loc":           "local-service_handler-multi_os",
 		"Operation":     "UploadFile",
@@ -691,37 +940,58 @@ func (m *MultiOSLocalFManServiceHandler) UploadFile(ctx context.Context, userUUI
 	defer logger.Debug("Finish uploading file")
 	// Pre-validate inputs
 	if !m.uuidTool.ValidateUUID(userUUID) {
-		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
-		return "", errors.New(InvalidUserUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidUserUUIDErrorMessage)
+		return "", models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidUserUUIDErrorMessage,
+		}
 	}
 	if !fileUtils.IsFilenameOk(filename) {
-		logger.Info("[-USER-]", InvalidFileNameErrorMessage)
-		return "", errors.New(InvalidFileNameErrorMessage)
+		logger.Info("[-USER-]", invalidFileNameErrorMessage)
+		return "", models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidFileNameErrorMessage,
+		}
 	}
 	if !m.uuidTool.ValidateUUID(parentDirUUID) {
-		logger.Info("[-USER-]", InvalidParentDirUUIDErrorMessage)
-		return "", errors.New(InvalidParentDirUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidParentDirUUIDErrorMessage)
+		return "", models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidParentDirUUIDErrorMessage,
+		}
 	}
 	// Authorization.
 	isAuthorized, err := m.author.AuthorizeActionsOnDir(ctx, userUUID, parentDirUUID, author.UploadToDirAction)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	if !isAuthorized {
-		logger.Info(ForbiddenOperationErrorMessage)
-		return "", errors.New(ForbiddenOperationErrorMessage)
+		logger.Info(forbiddenOperationErrorMessage)
+		return "", models.XtremeError{
+			Code:    models.ForbiddenOperationErrorCode,
+			Message: forbiddenOperationErrorMessage,
+		}
 	}
 
 	// Check if the file already exists in a desired location in the db.
 	isFilenameExist, err := m.localFManDBRepo.IsNameExist(ctx, filename, parentDirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsNameExist failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	if isFilenameExist {
 		logger.Infof("[-USER-] %s already exists in the desired location", filename)
-		return "", errors.New(NameAlreadyExistErrorMessage)
+		return "", models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: nameAlreadyExistErrorMessage,
+		}
 	}
 	// Generate a new UUID.
 	newFileUUID := m.uuidTool.NewUUID()
@@ -731,7 +1001,10 @@ func (m *MultiOSLocalFManServiceHandler) UploadFile(ctx context.Context, userUUI
 	size, err := m.fileOps.SaveFile(relPathOD, contentReader)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] SaveFile failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	newFileMetadata := models.FileMetadata{
 		UUID:          newFileUUID,
@@ -753,12 +1026,15 @@ func (m *MultiOSLocalFManServiceHandler) UploadFile(ctx context.Context, userUUI
 			}
 		}()
 		logger.Errorf("[-INTERNAL-] InsertFileMetadata failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	return newFileUUID, nil
 }
 
-func (m *MultiOSLocalFManServiceHandler) CopyFile(ctx context.Context, userUUID, fileUUID, dstParentDirUUID string) (string, error) {
+func (m *MultiOSFileManager) CopyFile(ctx context.Context, userUUID, fileUUID, dstParentDirUUID string) (string, error) {
 	logger := log.WithFields(log.Fields{
 		"Loc":              "local-service_handler-multi_os",
 		"Operation":        "CopyFile",
@@ -770,61 +1046,94 @@ func (m *MultiOSLocalFManServiceHandler) CopyFile(ctx context.Context, userUUID,
 	defer logger.Debug("Finish copying file")
 	// Pre-validate inputs
 	if !m.uuidTool.ValidateUUID(userUUID) {
-		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
-		return "", errors.New(InvalidUserUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidUserUUIDErrorMessage)
+		return "", models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidUserUUIDErrorMessage,
+		}
 	}
 	if !m.uuidTool.ValidateUUID(fileUUID) {
-		logger.Info("[-USER-]", InvalidFileUUIDErrorMessage)
-		return "", errors.New(InvalidFileUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidFileUUIDErrorMessage)
+		return "", models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidFileUUIDErrorMessage,
+		}
 	}
 	if !m.uuidTool.ValidateUUID(dstParentDirUUID) {
-		logger.Info("[-USER-]", InvalidParentDirUUIDErrorMessage)
-		return "", errors.New(InvalidParentDirUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidParentDirUUIDErrorMessage)
+		return "", models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidParentDirUUIDErrorMessage,
+		}
 	}
 	// Authorization.
 	isAuthorized, err := m.author.AuthorizeActionsOnDir(ctx, userUUID, dstParentDirUUID, author.UploadToDirAction)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	if !isAuthorized {
-		logger.Info(ForbiddenOperationErrorMessage)
-		return "", errors.New(ForbiddenOperationErrorMessage)
+		logger.Info(forbiddenOperationErrorMessage)
+		return "", models.XtremeError{
+			Code:    models.ForbiddenOperationErrorCode,
+			Message: forbiddenOperationErrorMessage,
+		}
 	}
 	isAuthorized, err = m.author.AuthorizeActionsOnFile(ctx, userUUID, fileUUID, author.CopyFileAction)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnFile failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	if !isAuthorized {
-		logger.Info(ForbiddenOperationErrorMessage)
-		return "", errors.New(ForbiddenOperationErrorMessage)
+		logger.Info(forbiddenOperationErrorMessage)
+		return "", models.XtremeError{
+			Code:    models.ForbiddenOperationErrorCode,
+			Message: forbiddenOperationErrorMessage,
+		}
 	}
 	return m.copyFile(ctx, logger, userUUID, fileUUID, dstParentDirUUID)
 }
 
-func (m *MultiOSLocalFManServiceHandler) copyFile(ctx context.Context, logger *log.Entry, userUUID, fileUUID, dstParentDirUUID string) (string, error) {
+func (m *MultiOSFileManager) copyFile(ctx context.Context, logger *log.Entry, userUUID, fileUUID, dstParentDirUUID string) (string, error) {
 	// Get the source file metadata.
 	srcFile, err := m.localFManDBRepo.GetFileMetadata(ctx, fileUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetFileMetadata failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	// Check if the file already exists in a desired location in the db.
 	isExist, err := m.localFManDBRepo.IsNameExist(ctx, srcFile.Filename, dstParentDirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsNameExist failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	if isExist {
 		logger.Infof("[-USER-] %s already exists in the desired location", srcFile.Filename)
-		return "", errors.New(NameAlreadyExistErrorMessage)
+		return "", models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: nameAlreadyExistErrorMessage,
+		}
 	}
 	// Get source file reader to read its content.
 	srcFReadCloser, err := m.fileOps.ReadFile(srcFile.RelPathOnDisk)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] ReadFile failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	defer srcFReadCloser.Close()
 
@@ -836,7 +1145,10 @@ func (m *MultiOSLocalFManServiceHandler) copyFile(ctx context.Context, logger *l
 	size, err := m.fileOps.SaveFile(relDstPathOD, srcFReadCloser)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] SaveFile failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	newFileMetadata := models.FileMetadata{
 		UUID:          newFileUUID,
@@ -858,12 +1170,15 @@ func (m *MultiOSLocalFManServiceHandler) copyFile(ctx context.Context, logger *l
 			}
 		}()
 		logger.Errorf("[-INTERNAL-] InsertFileMetadata failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	return newFileUUID, nil
 }
 
-func (m *MultiOSLocalFManServiceHandler) MoveFile(ctx context.Context, userUUID, fileUUID, dstParentDirUUID string) (string, error) {
+func (m *MultiOSFileManager) MoveFile(ctx context.Context, userUUID, fileUUID, dstParentDirUUID string) error {
 	logger := log.WithFields(log.Fields{
 		"Loc":              "local-service_handler-multi_os",
 		"Operation":        "MoveFile",
@@ -875,63 +1190,96 @@ func (m *MultiOSLocalFManServiceHandler) MoveFile(ctx context.Context, userUUID,
 	defer logger.Debug("Finish moving file")
 	// Pre-validate inputs
 	if !m.uuidTool.ValidateUUID(userUUID) {
-		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
-		return "", errors.New(InvalidUserUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidUserUUIDErrorMessage)
+		return models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidUserUUIDErrorMessage,
+		}
 	}
 	if !m.uuidTool.ValidateUUID(fileUUID) {
-		logger.Info("[-USER-]", InvalidFileUUIDErrorMessage)
-		return "", errors.New(InvalidFileUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidFileUUIDErrorMessage)
+		return models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidFileUUIDErrorMessage,
+		}
 	}
 	if !m.uuidTool.ValidateUUID(dstParentDirUUID) {
-		logger.Info("[-USER-]", InvalidParentDirUUIDErrorMessage)
-		return "", errors.New(InvalidParentDirUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidParentDirUUIDErrorMessage)
+		return models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidParentDirUUIDErrorMessage,
+		}
 	}
 	// Authorization.
 	isAuthorized, err := m.author.AuthorizeActionsOnDir(ctx, userUUID, dstParentDirUUID, author.UploadToDirAction)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	if !isAuthorized {
-		logger.Info(ForbiddenOperationErrorMessage)
-		return "", errors.New(ForbiddenOperationErrorMessage)
+		logger.Info(forbiddenOperationErrorMessage)
+		return models.XtremeError{
+			Code:    models.ForbiddenOperationErrorCode,
+			Message: forbiddenOperationErrorMessage,
+		}
 	}
 	isAuthorized, err = m.author.AuthorizeActionsOnFile(ctx, userUUID, fileUUID, author.CopyFileAction, author.RemoveFileAction)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnFile failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	if !isAuthorized {
-		logger.Info(ForbiddenOperationErrorMessage)
-		return "", errors.New(ForbiddenOperationErrorMessage)
+		logger.Info(forbiddenOperationErrorMessage)
+		return models.XtremeError{
+			Code:    models.ForbiddenOperationErrorCode,
+			Message: forbiddenOperationErrorMessage,
+		}
 	}
 
 	// Get the file metadata.
 	srcFile, err := m.localFManDBRepo.GetFileMetadata(ctx, fileUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetFileMetadata failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	// Check if the file already exists in a desired location in the db.
 	isExist, err := m.localFManDBRepo.IsNameExist(ctx, srcFile.Filename, dstParentDirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsNameExist failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	if isExist {
 		logger.Infof("[-USER-] %s already exists in the desired location", srcFile.Filename)
-		return "", errors.New(NameAlreadyExistErrorMessage)
+		return models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: nameAlreadyExistErrorMessage,
+		}
 	}
 	srcFile.ParentUUID = dstParentDirUUID
 	err = m.localFManDBRepo.UpdateFileMetadata(ctx, srcFile)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] UpdateFileMetadata failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
-	return fileUUID, nil
+	return nil
 }
 
-func (m *MultiOSLocalFManServiceHandler) GetFile(ctx context.Context, userUUID, fileUUID string) (models.File, error) {
+func (m *MultiOSFileManager) GetFile(ctx context.Context, userUUID, fileUUID string) (models.File, error) {
 	logger := log.WithFields(log.Fields{
 		"Loc":       "local-service_handler-multi_os",
 		"Operation": "GetFile",
@@ -942,34 +1290,49 @@ func (m *MultiOSLocalFManServiceHandler) GetFile(ctx context.Context, userUUID, 
 	defer logger.Debug("Finish retrieving file metadata")
 	// Pre-validate inputs
 	if !m.uuidTool.ValidateUUID(userUUID) {
-		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
-		return models.File{}, errors.New(InvalidUserUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidUserUUIDErrorMessage)
+		return models.File{}, models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidUserUUIDErrorMessage,
+		}
 	}
 	if !m.uuidTool.ValidateUUID(fileUUID) {
-		logger.Info("[-USER-]", InvalidFileUUIDErrorMessage)
-		return models.File{}, errors.New(InvalidFileUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidFileUUIDErrorMessage)
+		return models.File{}, models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidFileUUIDErrorMessage,
+		}
 	}
 	// Authorization.
 	isAuthorized, err := m.author.AuthorizeActionsOnFile(ctx, userUUID, fileUUID, author.ViewFileAction)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnFile failed with error %s", err.Error())
-		return models.File{}, errors.New(InternalErrorMessage)
+		return models.File{}, models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	if !isAuthorized {
-		logger.Info(ForbiddenOperationErrorMessage)
-		return models.File{}, errors.New(ForbiddenOperationErrorMessage)
+		logger.Info(forbiddenOperationErrorMessage)
+		return models.File{}, models.XtremeError{
+			Code:    models.ForbiddenOperationErrorCode,
+			Message: forbiddenOperationErrorMessage,
+		}
 	}
 
 	// Get the file metadata.
 	srcFile, err := m.localFManDBRepo.GetFile(ctx, fileUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetFile failed with error %s", err.Error())
-		return models.File{}, errors.New(InternalErrorMessage)
+		return models.File{}, models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	return srcFile, nil
 }
 
-func (m *MultiOSLocalFManServiceHandler) DownloadFile(ctx context.Context, userUUID, fileUUID string) (models.FilePayload, error) {
+func (m *MultiOSFileManager) DownloadFile(ctx context.Context, userUUID, fileUUID string) (models.FilePayload, error) {
 	logger := log.WithFields(log.Fields{
 		"Loc":       "local-service_handler-multi_os",
 		"Operation": "DownloadFile",
@@ -980,43 +1343,61 @@ func (m *MultiOSLocalFManServiceHandler) DownloadFile(ctx context.Context, userU
 	defer logger.Debug("Finish getting file payload")
 	// Pre-validate inputs
 	if !m.uuidTool.ValidateUUID(userUUID) {
-		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
-		return models.FilePayload{}, errors.New(InvalidUserUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidUserUUIDErrorMessage)
+		return models.FilePayload{}, models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidUserUUIDErrorMessage,
+		}
 	}
 	if !m.uuidTool.ValidateUUID(fileUUID) {
-		logger.Info("[-USER-]", InvalidFileUUIDErrorMessage)
-		return models.FilePayload{}, errors.New(InvalidFileUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidFileUUIDErrorMessage)
+		return models.FilePayload{}, models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidFileUUIDErrorMessage,
+		}
 	}
 	// Authorization.
 	isAuthorized, err := m.author.AuthorizeActionsOnFile(ctx, userUUID, fileUUID, author.ViewFileAction)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnFile failed with error %s", err.Error())
-		return models.FilePayload{}, errors.New(InternalErrorMessage)
+		return models.FilePayload{}, models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	if !isAuthorized {
-		logger.Info(ForbiddenOperationErrorMessage)
-		return models.FilePayload{}, errors.New(ForbiddenOperationErrorMessage)
+		logger.Info(forbiddenOperationErrorMessage)
+		return models.FilePayload{}, models.XtremeError{
+			Code:    models.ForbiddenOperationErrorCode,
+			Message: forbiddenOperationErrorMessage,
+		}
 	}
 
 	// Get the file metadata.
 	srcFile, err := m.localFManDBRepo.GetFileMetadata(ctx, fileUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetFileMetadata failed with error %s", err.Error())
-		return models.FilePayload{}, errors.New(InternalErrorMessage)
+		return models.FilePayload{}, models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	fileRCloser, err := m.fileOps.ReadFile(srcFile.RelPathOnDisk)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] ReadFile failed with error %s", err.Error())
-		return models.FilePayload{}, errors.New(InternalErrorMessage)
+		return models.FilePayload{}, models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	payload := models.FilePayload{
-		Filename:      srcFile.Filename,
-		ReadCloser:    fileRCloser,
+		Filename: srcFile.Filename,
+		File:     fileRCloser,
 	}
 	return payload, nil
 }
 
-func (m *MultiOSLocalFManServiceHandler) DownloadFileBatch(ctx context.Context, userUUID string, fileUUIDs []string) (models.TmpFilePayload, error) {
+func (m *MultiOSFileManager) DownloadFileBatch(ctx context.Context, userUUID string, fileUUIDs []string) (models.TmpFilePayload, error) {
 	logger := log.WithFields(log.Fields{
 		"Loc":       "local-service_handler-multi_os",
 		"Operation": "DownloadFileBatch",
@@ -1027,13 +1408,19 @@ func (m *MultiOSLocalFManServiceHandler) DownloadFileBatch(ctx context.Context, 
 	defer logger.Debug("Finish getting files' payloads")
 	// Pre-validate inputs
 	if !m.uuidTool.ValidateUUID(userUUID) {
-		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
-		return models.TmpFilePayload{}, errors.New(InvalidUserUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidUserUUIDErrorMessage)
+		return models.TmpFilePayload{}, models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidUserUUIDErrorMessage,
+		}
 	}
 	for _, uuid := range fileUUIDs {
 		if !m.uuidTool.ValidateUUID(uuid) {
-			logger.Info("[-USER-]", InvalidFileUUIDErrorMessage)
-			return models.TmpFilePayload{}, errors.New(InvalidFileUUIDErrorMessage)
+			logger.Info("[-USER-]", invalidFileUUIDErrorMessage)
+			return models.TmpFilePayload{}, models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidFileUUIDErrorMessage,
+		}
 		}
 	}
 	// Authorization.
@@ -1041,18 +1428,27 @@ func (m *MultiOSLocalFManServiceHandler) DownloadFileBatch(ctx context.Context, 
 		isAuthorized, err := m.author.AuthorizeActionsOnFile(ctx, userUUID, uuid, author.ViewFileAction)
 		if err != nil {
 			logger.Errorf("[-INTERNAL-] AuthorizeActionsOnFile failed with error %s", err.Error())
-			return models.TmpFilePayload{}, errors.New(InternalErrorMessage)
+			return models.TmpFilePayload{}, models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 		}
 		if !isAuthorized {
-			logger.Info(ForbiddenOperationErrorMessage)
-			return models.TmpFilePayload{}, errors.New(ForbiddenOperationErrorMessage)
+			logger.Info(forbiddenOperationErrorMessage)
+			return models.TmpFilePayload{}, models.XtremeError{
+			Code:    models.ForbiddenOperationErrorCode,
+			Message: forbiddenOperationErrorMessage,
+		}
 		}
 	}
 	// Get the files' metadata.
 	srcFiles, err := m.localFManDBRepo.GetFileMetadataBatch(ctx, fileUUIDs)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetFileMetadataBatch failed with error %s", err.Error())
-		return models.TmpFilePayload{}, errors.New(InternalErrorMessage)
+		return models.TmpFilePayload{}, models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	inZipPaths := make(map[string]string)
 	for _, srcFile := range srcFiles {
@@ -1061,21 +1457,27 @@ func (m *MultiOSLocalFManServiceHandler) DownloadFileBatch(ctx context.Context, 
 	tmpFilePath, err := m.fileCompress.CompressFiles(inZipPaths)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] CompressFiles failed with error %s", err.Error())
-		return models.TmpFilePayload{}, errors.New(InternalErrorMessage)
+		return models.TmpFilePayload{}, models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	tmpFHanlder, err := m.fileOps.GetTmpFileHandler(tmpFilePath)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetTmpFileHandler failed with error %s", err.Error())
-		return models.TmpFilePayload{}, errors.New(InternalErrorMessage)
+		return models.TmpFilePayload{}, models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	payload := models.TmpFilePayload{
-		Filename:      filepath.Base(tmpFilePath),
-		TmpFile:       tmpFHanlder,
+		Filename: filepath.Base(tmpFilePath),
+		TmpFile:  tmpFHanlder,
 	}
 	return payload, nil
 }
 
-func (m *MultiOSLocalFManServiceHandler) SearchByName(ctx context.Context, userUUID, filename, parentDirUUID string) ([]models.File, []models.Directory, error) {
+func (m *MultiOSFileManager) SearchByName(ctx context.Context, userUUID, filename, parentDirUUID string) ([]models.File, []models.Directory, error) {
 	// Init logger header
 	logger := log.WithFields(log.Fields{
 		"Loc":           "local-service_handler-multi_os",
@@ -1087,37 +1489,55 @@ func (m *MultiOSLocalFManServiceHandler) SearchByName(ctx context.Context, userU
 	defer logger.Debug("Finish retrieving UUID via path")
 	// Pre-validate inputs
 	if !m.uuidTool.ValidateUUID(userUUID) {
-		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
-		return nil, nil, errors.New(InvalidUserUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidUserUUIDErrorMessage)
+		return nil, nil, models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidUserUUIDErrorMessage,
+		}
 	}
 	if !fileUtils.IsFilenameOk(filename) {
-		logger.Info("[-USER-]", InvalidFileNameErrorMessage)
-		return nil, nil, errors.New(InvalidFileNameErrorMessage)
+		logger.Info("[-USER-]", invalidFileNameErrorMessage)
+		return nil, nil, models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidFileNameErrorMessage,
+		}
 	}
 	if !m.uuidTool.ValidateUUID(parentDirUUID) {
-		logger.Info("[-USER-]", InvalidParentDirUUIDErrorMessage)
-		return nil, nil, errors.New(InvalidParentDirUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidParentDirUUIDErrorMessage)
+		return nil, nil, models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidParentDirUUIDErrorMessage,
+		}
 	}
 	// Authorization.
 	isAuthorized, err := m.author.AuthorizeActionsOnDir(ctx, userUUID, parentDirUUID, author.ViewDirAction)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
-		return nil, nil, errors.New(InternalErrorMessage)
+		return nil, nil, models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	if !isAuthorized {
-		logger.Info(ForbiddenOperationErrorMessage)
-		return nil, nil, errors.New(ForbiddenOperationErrorMessage)
+		logger.Info(forbiddenOperationErrorMessage)
+		return nil, nil, models.XtremeError{
+			Code:    models.ForbiddenOperationErrorCode,
+			Message: forbiddenOperationErrorMessage,
+		}
 	}
 
 	files, dirs, err := m.localFManDBRepo.SearchByName(ctx, userUUID, filename, parentDirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetUUIDByPath failed with error %s", err.Error())
-		return nil, nil, errors.New(InternalErrorMessage)
+		return nil, nil, models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	return files, dirs, nil
 }
 
-func (m *MultiOSLocalFManServiceHandler) CreateNewDirectory(ctx context.Context, userUUID, dirname, parentDirUUID string) (string, error) {
+func (m *MultiOSFileManager) CreateNewDirectory(ctx context.Context, userUUID, dirname, parentDirUUID string) (string, error) {
 	logger := log.WithFields(log.Fields{
 		"Loc":           "local-service_handler-multi_os",
 		"Operation":     "CreateNewDirectory",
@@ -1129,41 +1549,62 @@ func (m *MultiOSLocalFManServiceHandler) CreateNewDirectory(ctx context.Context,
 	defer logger.Debug("Finish creating a new directory")
 	// Pre-validate inputs
 	if m.uuidTool.ValidateUUID(userUUID) {
-		logger.Info("[-USER-]", InvalidUserUUIDErrorMessage)
-		return "", errors.New(InvalidUserUUIDErrorMessage)
+		logger.Info("[-USER-]", invalidUserUUIDErrorMessage)
+		return "", models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidUserUUIDErrorMessage,
+		}
 	}
 	if !fileUtils.IsFilenameOk(dirname) {
-		logger.Info("[-USER-]", InvalidDirNameErrorMessage)
-		return "", errors.New(InvalidDirNameErrorMessage)
+		logger.Info("[-USER-]", invalidDirNameErrorMessage)
+		return "", models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidDirNameErrorMessage,
+		}
 	}
 	if m.uuidTool.ValidateUUID(parentDirUUID) {
-		logger.Info("[-USER-]", InvalidDirNameErrorMessage)
-		return "", errors.New(InvalidDirNameErrorMessage)
+		logger.Info("[-USER-]", invalidParentDirUUIDErrorMessage)
+		return "", models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: invalidParentDirUUIDErrorMessage,
+		}
 	}
 	// Authorization.
 	isAuthorized, err := m.author.AuthorizeActionsOnDir(ctx, userUUID, parentDirUUID, author.UploadToDirAction)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	if !isAuthorized {
-		logger.Info(ForbiddenOperationErrorMessage)
-		return "", errors.New(ForbiddenOperationErrorMessage)
+		logger.Info(forbiddenOperationErrorMessage)
+		return "", models.XtremeError{
+			Code:    models.ForbiddenOperationErrorCode,
+			Message: forbiddenOperationErrorMessage,
+		}
 	}
 
 	return m.createNewDirectory(ctx, logger, userUUID, dirname, parentDirUUID)
 }
 
-func (m *MultiOSLocalFManServiceHandler) createNewDirectory(ctx context.Context, logger *log.Entry, userUUID, dirname, parentDirUUID string) (string, error) {
+func (m *MultiOSFileManager) createNewDirectory(ctx context.Context, logger *log.Entry, userUUID, dirname, parentDirUUID string) (string, error) {
 	// Check if the directory already exists in a desired location in the db.
 	isExist, err := m.localFManDBRepo.IsNameExist(ctx, dirname, parentDirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsNameExist failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	if isExist {
 		logger.Infof("[-USER-] %s already exists in the desired location", dirname)
-		return "", errors.New(NameAlreadyExistErrorMessage)
+		return "", models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: nameAlreadyExistErrorMessage,
+		}
 	}
 	// Generate a new UUID.
 	newDirUUID := m.uuidTool.NewUUID()
@@ -1178,7 +1619,10 @@ func (m *MultiOSLocalFManServiceHandler) createNewDirectory(ctx context.Context,
 	err = m.localFManDBRepo.InsertDirectoryMetadata(ctx, newDirMetadata)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] InsertDirRecord failed with error %s", err.Error())
-		return "", errors.New(InternalErrorMessage)
+		return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
 	}
 	return newDirUUID, nil
 }

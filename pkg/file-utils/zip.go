@@ -19,13 +19,13 @@ type FileZipper struct {
 }
 
 // CreateNewFileZipper create a new FileZipper.
-func CreateNewFileZipper(basePath, tmpFilePath string) *FileZipper {
-	return &FileZipper{
+func CreateNewFileZipper(basePath, tmpFilePath string) FileZipper {
+	return FileZipper{
 		basePath,
 	}
 }
 
-func (z *FileZipper) CompressFiles(inZipPaths map[string]string) (string, error) {
+func (z FileZipper) CompressFiles(inZipPaths map[string]string) (string, error) {
 	tmpFile, err := ioutil.TempFile("", "compress_temp_*")
 	if err != nil {
 		log.Fatal(err)

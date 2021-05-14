@@ -2,7 +2,6 @@ package models
 
 import (
 	fileUtils "github.com/nvthongswansea/xtreme/pkg/file-utils"
-	"io"
 	"time"
 )
 
@@ -56,13 +55,13 @@ type FileDescription struct {
 
 // FilePayload holds content reader of a file.
 type FilePayload struct {
-	Filename      string
-	ReadCloser    io.ReadCloser
+	Filename string
+	File     fileUtils.FileReadCloser
 }
 
 // TmpFilePayload holds content reader of a temp file.
 // With *os.File, the temp file can be removed after use.
 type TmpFilePayload struct {
-	Filename      string
-	TmpFile       fileUtils.TmpFileHandler
+	Filename string
+	TmpFile  fileUtils.TmpFileHandler
 }
