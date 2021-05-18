@@ -22,4 +22,5 @@ func resolveError(err error, c echo.Context, forceCode int) error {
 		return c.JSON(http.StatusUnauthorized, err)
 	default:
 	}
+	return c.JSON(http.StatusBadRequest, err)
 }
