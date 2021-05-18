@@ -31,12 +31,12 @@ const (
 // MultiOSFileManager implements interface local.FileManagerService.
 // This implementation of local.FileManagerService supports multiple Operating Systems.
 type MultiOSFileManager struct {
-	fileRepo file.Repository
-	dirRepo directory.Repository
-	uuidTool        uuidUtils.UUIDGenerateValidator
-	fileOps         fileUtils.FileSaveReadCpRmer
-	fileCompress    fileUtils.FileCompressor
-	author          author.Authorizer
+	fileRepo     file.Repository
+	dirRepo      directory.Repository
+	uuidTool     uuidUtils.UUIDGenerateValidator
+	fileOps      fileUtils.FileSaveReadCpRmer
+	fileCompress fileUtils.FileCompressor
+	author       author.Authorizer
 }
 
 // NewMultiOSFileManager creates a new MultiOSFileManager.
@@ -73,7 +73,7 @@ func (m *MultiOSFileManager) GetRootDirectory(ctx context.Context, userUUID stri
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetRootDirectoryByUserUUID failed with error %s", err.Error())
 		return models.Directory{}, models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -118,7 +118,7 @@ func (m *MultiOSFileManager) RenameFile(ctx context.Context, userUUID, fileUUID,
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnFile failed with error %s", err.Error())
 		return models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -135,7 +135,7 @@ func (m *MultiOSFileManager) RenameFile(ctx context.Context, userUUID, fileUUID,
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetFileMetadata failed with error %s", err.Error())
 		return models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -145,7 +145,7 @@ func (m *MultiOSFileManager) RenameFile(ctx context.Context, userUUID, fileUUID,
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsFilenameExist failed with error %s", err.Error())
 		return models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -153,7 +153,7 @@ func (m *MultiOSFileManager) RenameFile(ctx context.Context, userUUID, fileUUID,
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsDirNameExist failed with error %s", err.Error())
 		return models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -168,7 +168,7 @@ func (m *MultiOSFileManager) RenameFile(ctx context.Context, userUUID, fileUUID,
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] UpdateFilename failed with error %s", err.Error())
 		return models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -205,7 +205,7 @@ func (m *MultiOSFileManager) SoftRemoveFile(ctx context.Context, userUUID, fileU
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnFile failed with error %s", err.Error())
 		return models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -221,7 +221,7 @@ func (m *MultiOSFileManager) SoftRemoveFile(ctx context.Context, userUUID, fileU
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] SoftRemoveFile failed with error %s", err.Error())
 		return models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -257,7 +257,7 @@ func (m *MultiOSFileManager) HardRemoveFile(ctx context.Context, userUUID, fileU
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnFile failed with error %s", err.Error())
 		return models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -273,7 +273,7 @@ func (m *MultiOSFileManager) HardRemoveFile(ctx context.Context, userUUID, fileU
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] HardRemoveFile failed with error %s", err.Error())
 		return models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -309,7 +309,7 @@ func (m *MultiOSFileManager) GetDirectory(ctx context.Context, userUUID, dirUUID
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
 		return models.Directory{}, models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -325,7 +325,7 @@ func (m *MultiOSFileManager) GetDirectory(ctx context.Context, userUUID, dirUUID
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetDirectory failed with error %s", err.Error())
 		return models.Directory{}, models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -369,7 +369,7 @@ func (m *MultiOSFileManager) CopyDirectory(ctx context.Context, userUUID, dirUUI
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
 		return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -389,7 +389,7 @@ func (m *MultiOSFileManager) copyDirectory(ctx context.Context, logger *log.Entr
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetDirMetadata failed with error %s", err.Error())
 		return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -399,7 +399,7 @@ func (m *MultiOSFileManager) copyDirectory(ctx context.Context, logger *log.Entr
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] createNewDirectory failed with error %s", err.Error())
 		return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -409,7 +409,7 @@ func (m *MultiOSFileManager) copyDirectory(ctx context.Context, logger *log.Entr
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetFileMetadataListByDir failed with error %s", err.Error())
 		return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -418,9 +418,9 @@ func (m *MultiOSFileManager) copyDirectory(ctx context.Context, logger *log.Entr
 		if err != nil {
 			logger.Errorf("[-INTERNAL-] copyFile failed with error %s", err.Error())
 			return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
-			Message: err.Error(),
-		}
+				Code:    models.InternalServerErrorCode,
+				Message: err.Error(),
+			}
 		}
 	}
 
@@ -429,7 +429,7 @@ func (m *MultiOSFileManager) copyDirectory(ctx context.Context, logger *log.Entr
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetDirectChildDirUUIDList failed with error %s", err.Error())
 		return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -439,9 +439,9 @@ func (m *MultiOSFileManager) copyDirectory(ctx context.Context, logger *log.Entr
 		if err != nil {
 			logger.Errorf("[-INTERNAL-] copyDirectory failed with error %s", err.Error())
 			return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
-			Message: err.Error(),
-		}
+				Code:    models.InternalServerErrorCode,
+				Message: err.Error(),
+			}
 		}
 	}
 	return nDirCopyUUID, nil
@@ -485,7 +485,7 @@ func (m *MultiOSFileManager) RenameDirectory(ctx context.Context, userUUID, dirU
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
 		return models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -502,7 +502,7 @@ func (m *MultiOSFileManager) RenameDirectory(ctx context.Context, userUUID, dirU
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetDirMetadata failed with error %s", err.Error())
 		return models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -512,7 +512,7 @@ func (m *MultiOSFileManager) RenameDirectory(ctx context.Context, userUUID, dirU
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsFilenameExist failed with error %s", err.Error())
 		return models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -520,7 +520,7 @@ func (m *MultiOSFileManager) RenameDirectory(ctx context.Context, userUUID, dirU
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsDirNameExist failed with error %s", err.Error())
 		return models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -535,7 +535,7 @@ func (m *MultiOSFileManager) RenameDirectory(ctx context.Context, userUUID, dirU
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] UpdateDirname failed with error %s", err.Error())
 		return models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -579,7 +579,7 @@ func (m *MultiOSFileManager) MoveDirectory(ctx context.Context, userUUID, dirUUI
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
 		return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -596,7 +596,7 @@ func (m *MultiOSFileManager) MoveDirectory(ctx context.Context, userUUID, dirUUI
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetDirMetadata failed with error %s", err.Error())
 		return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -605,8 +605,8 @@ func (m *MultiOSFileManager) MoveDirectory(ctx context.Context, userUUID, dirUUI
 	isExist, err = m.fileRepo.IsFilenameExist(ctx, dirMeta.Dirname, dirMeta.ParentUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsFilenameExist failed with error %s", err.Error())
-		return "",models.XtremeError{
-			Code: models.InternalServerErrorCode,
+		return "", models.XtremeError{
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -614,7 +614,7 @@ func (m *MultiOSFileManager) MoveDirectory(ctx context.Context, userUUID, dirUUI
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsDirNameExist failed with error %s", err.Error())
 		return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -629,7 +629,7 @@ func (m *MultiOSFileManager) MoveDirectory(ctx context.Context, userUUID, dirUUI
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] UpdateParentDirUUID failed with error %s", err.Error())
 		return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -665,7 +665,7 @@ func (m *MultiOSFileManager) DownloadDirectory(ctx context.Context, userUUID, di
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
 		return models.TmpFilePayload{}, models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -682,7 +682,7 @@ func (m *MultiOSFileManager) DownloadDirectory(ctx context.Context, userUUID, di
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetDirMetadata failed with error %s", err.Error())
 		return models.TmpFilePayload{}, models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -692,7 +692,7 @@ func (m *MultiOSFileManager) DownloadDirectory(ctx context.Context, userUUID, di
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetFileMetadataListByDir failed with error %s", err.Error())
 		return models.TmpFilePayload{}, models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -703,7 +703,7 @@ func (m *MultiOSFileManager) DownloadDirectory(ctx context.Context, userUUID, di
 		if err != nil {
 			logger.Errorf("[-INTERNAL-] filepath.Rel failed with error %s", err.Error())
 			return models.TmpFilePayload{}, models.XtremeError{
-				Code: models.InternalServerErrorCode,
+				Code:    models.InternalServerErrorCode,
 				Message: err.Error(),
 			}
 		}
@@ -713,25 +713,26 @@ func (m *MultiOSFileManager) DownloadDirectory(ctx context.Context, userUUID, di
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] CompressFiles failed with error %s", err.Error())
 		return models.TmpFilePayload{}, models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
-	tmpFHanlder, err := m.fileOps.GetFileReadCloserRmer(tmpFilePath)
+	tmpFile, err := m.fileOps.GetFileReadCloserRmer(tmpFilePath)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetFileReadCloserRmer failed with error %s", err.Error())
 		return models.TmpFilePayload{}, models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
 	payload := models.TmpFilePayload{
 		Filename: filepath.Base(tmpFilePath),
-		TmpFile:  tmpFHanlder,
+		TmpFile:  tmpFile,
 	}
 	return payload, nil
 }
 
+// TODO: reimplement SoftRemoveDir
 func (m *MultiOSFileManager) SoftRemoveDir(ctx context.Context, userUUID, dirUUID string) error {
 	// Init logger header
 	logger := log.WithFields(log.Fields{
@@ -762,7 +763,7 @@ func (m *MultiOSFileManager) SoftRemoveDir(ctx context.Context, userUUID, dirUUI
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
 		return models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -778,13 +779,14 @@ func (m *MultiOSFileManager) SoftRemoveDir(ctx context.Context, userUUID, dirUUI
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] SoftRemoveDir failed with error %s", err.Error())
 		return models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
 	return nil
 }
 
+// TODO: reimplement HardRemoveDir
 func (m *MultiOSFileManager) HardRemoveDir(ctx context.Context, userUUID, dirUUID string) error {
 	// Init logger header
 	logger := log.WithFields(log.Fields{
@@ -815,7 +817,7 @@ func (m *MultiOSFileManager) HardRemoveDir(ctx context.Context, userUUID, dirUUI
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
 		return models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -831,7 +833,7 @@ func (m *MultiOSFileManager) HardRemoveDir(ctx context.Context, userUUID, dirUUI
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] HardRemoveDir failed with error %s", err.Error())
 		return models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -868,7 +870,7 @@ func (m *MultiOSFileManager) GetDirUUIDByPath(ctx context.Context, userUUID, pat
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetDirUUIDByPath failed with error %s", err.Error())
 		return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -935,7 +937,7 @@ func (m *MultiOSFileManager) UploadFile(ctx context.Context, userUUID, filename,
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
 		return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -953,7 +955,7 @@ func (m *MultiOSFileManager) UploadFile(ctx context.Context, userUUID, filename,
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsFilenameExist failed with error %s", err.Error())
 		return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -961,7 +963,7 @@ func (m *MultiOSFileManager) UploadFile(ctx context.Context, userUUID, filename,
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsDirNameExist failed with error %s", err.Error())
 		return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -981,7 +983,7 @@ func (m *MultiOSFileManager) UploadFile(ctx context.Context, userUUID, filename,
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] SaveFile failed with error %s", err.Error())
 		return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1008,7 +1010,7 @@ func (m *MultiOSFileManager) UploadFile(ctx context.Context, userUUID, filename,
 		}()
 		logger.Errorf("[-INTERNAL-] InsertFile failed with error %s", err.Error())
 		return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1052,7 +1054,7 @@ func (m *MultiOSFileManager) CopyFile(ctx context.Context, userUUID, fileUUID, d
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
 		return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1067,7 +1069,7 @@ func (m *MultiOSFileManager) CopyFile(ctx context.Context, userUUID, fileUUID, d
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnFile failed with error %s", err.Error())
 		return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1087,7 +1089,7 @@ func (m *MultiOSFileManager) copyFile(ctx context.Context, logger *log.Entry, us
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetFileMetadata failed with error %s", err.Error())
 		return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1097,7 +1099,7 @@ func (m *MultiOSFileManager) copyFile(ctx context.Context, logger *log.Entry, us
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsFilenameExist failed with error %s", err.Error())
 		return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1105,7 +1107,7 @@ func (m *MultiOSFileManager) copyFile(ctx context.Context, logger *log.Entry, us
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsDirNameExist failed with error %s", err.Error())
 		return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1121,7 +1123,7 @@ func (m *MultiOSFileManager) copyFile(ctx context.Context, logger *log.Entry, us
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] ReadFile failed with error %s", err.Error())
 		return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1136,7 +1138,7 @@ func (m *MultiOSFileManager) copyFile(ctx context.Context, logger *log.Entry, us
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] SaveFile failed with error %s", err.Error())
 		return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1163,7 +1165,7 @@ func (m *MultiOSFileManager) copyFile(ctx context.Context, logger *log.Entry, us
 		}()
 		logger.Errorf("[-INTERNAL-] InsertFile failed with error %s", err.Error())
 		return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1207,7 +1209,7 @@ func (m *MultiOSFileManager) MoveFile(ctx context.Context, userUUID, fileUUID, d
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
 		return models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1222,7 +1224,7 @@ func (m *MultiOSFileManager) MoveFile(ctx context.Context, userUUID, fileUUID, d
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnFile failed with error %s", err.Error())
 		return models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1239,7 +1241,7 @@ func (m *MultiOSFileManager) MoveFile(ctx context.Context, userUUID, fileUUID, d
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetFileMetadata failed with error %s", err.Error())
 		return models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1249,7 +1251,7 @@ func (m *MultiOSFileManager) MoveFile(ctx context.Context, userUUID, fileUUID, d
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsFilenameExist failed with error %s", err.Error())
 		return models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1257,7 +1259,7 @@ func (m *MultiOSFileManager) MoveFile(ctx context.Context, userUUID, fileUUID, d
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsDirNameExist failed with error %s", err.Error())
 		return models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1272,7 +1274,7 @@ func (m *MultiOSFileManager) MoveFile(ctx context.Context, userUUID, fileUUID, d
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] UpdateParentDirUUID failed with error %s", err.Error())
 		return models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1308,7 +1310,7 @@ func (m *MultiOSFileManager) GetFile(ctx context.Context, userUUID, fileUUID str
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnFile failed with error %s", err.Error())
 		return models.File{}, models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1325,7 +1327,7 @@ func (m *MultiOSFileManager) GetFile(ctx context.Context, userUUID, fileUUID str
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetFile failed with error %s", err.Error())
 		return models.File{}, models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1361,7 +1363,7 @@ func (m *MultiOSFileManager) DownloadFile(ctx context.Context, userUUID, fileUUI
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnFile failed with error %s", err.Error())
 		return models.FilePayload{}, models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1378,7 +1380,7 @@ func (m *MultiOSFileManager) DownloadFile(ctx context.Context, userUUID, fileUUI
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetFileMetadata failed with error %s", err.Error())
 		return models.FilePayload{}, models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1386,7 +1388,7 @@ func (m *MultiOSFileManager) DownloadFile(ctx context.Context, userUUID, fileUUI
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] ReadFile failed with error %s", err.Error())
 		return models.FilePayload{}, models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1418,9 +1420,9 @@ func (m *MultiOSFileManager) DownloadFileBatch(ctx context.Context, userUUID str
 		if !m.uuidTool.ValidateUUID(uuid) {
 			logger.Info("[-USER-]", invalidFileUUIDErrorMessage)
 			return models.TmpFilePayload{}, models.XtremeError{
-			Code:    models.BadInputErrorCode,
-			Message: invalidFileUUIDErrorMessage,
-		}
+				Code:    models.BadInputErrorCode,
+				Message: invalidFileUUIDErrorMessage,
+			}
 		}
 	}
 	// Authorization.
@@ -1429,16 +1431,16 @@ func (m *MultiOSFileManager) DownloadFileBatch(ctx context.Context, userUUID str
 		if err != nil {
 			logger.Errorf("[-INTERNAL-] AuthorizeActionsOnFile failed with error %s", err.Error())
 			return models.TmpFilePayload{}, models.XtremeError{
-			Code: models.InternalServerErrorCode,
-			Message: err.Error(),
-		}
+				Code:    models.InternalServerErrorCode,
+				Message: err.Error(),
+			}
 		}
 		if !isAuthorized {
 			logger.Info(forbiddenOperationErrorMessage)
 			return models.TmpFilePayload{}, models.XtremeError{
-			Code:    models.ForbiddenOperationErrorCode,
-			Message: forbiddenOperationErrorMessage,
-		}
+				Code:    models.ForbiddenOperationErrorCode,
+				Message: forbiddenOperationErrorMessage,
+			}
 		}
 	}
 	// Get the files' metadata.
@@ -1446,7 +1448,7 @@ func (m *MultiOSFileManager) DownloadFileBatch(ctx context.Context, userUUID str
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetFileMetadataBatch failed with error %s", err.Error())
 		return models.TmpFilePayload{}, models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1458,7 +1460,7 @@ func (m *MultiOSFileManager) DownloadFileBatch(ctx context.Context, userUUID str
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] CompressFiles failed with error %s", err.Error())
 		return models.TmpFilePayload{}, models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1466,7 +1468,7 @@ func (m *MultiOSFileManager) DownloadFileBatch(ctx context.Context, userUUID str
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetFileReadCloserRmer failed with error %s", err.Error())
 		return models.TmpFilePayload{}, models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1514,7 +1516,7 @@ func (m *MultiOSFileManager) SearchByName(ctx context.Context, userUUID, filenam
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
 		return nil, nil, models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1530,7 +1532,7 @@ func (m *MultiOSFileManager) SearchByName(ctx context.Context, userUUID, filenam
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetFileMetadataListByName failed with error %s", err.Error())
 		return nil, nil, models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1538,7 +1540,7 @@ func (m *MultiOSFileManager) SearchByName(ctx context.Context, userUUID, filenam
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetDirMetadataListByName failed with error %s", err.Error())
 		return nil, nil, models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1582,7 +1584,7 @@ func (m *MultiOSFileManager) CreateNewDirectory(ctx context.Context, userUUID, d
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
 		return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1604,7 +1606,7 @@ func (m *MultiOSFileManager) createNewDirectory(ctx context.Context, logger *log
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsFilenameExist failed with error %s", err.Error())
 		return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1612,7 +1614,7 @@ func (m *MultiOSFileManager) createNewDirectory(ctx context.Context, logger *log
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] IsDirNameExist failed with error %s", err.Error())
 		return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
@@ -1637,7 +1639,7 @@ func (m *MultiOSFileManager) createNewDirectory(ctx context.Context, logger *log
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] InsertDirectoryMetadata failed with error %s", err.Error())
 		return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
+			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}

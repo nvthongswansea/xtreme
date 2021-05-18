@@ -16,7 +16,7 @@ const (
 )
 
 type XtremeError struct {
-	Code    int `json:"-"`
+	Code    int    `json:"-"`
 	Message string `json:"message"`
 }
 

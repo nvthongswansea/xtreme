@@ -9,7 +9,7 @@ import (
 // CasbinAuthorizer is a casbin implementation of
 // the interface Authorizer.
 type CasbinAuthorizer struct {
-	enforcer   *casbin.Enforcer
+	enforcer *casbin.Enforcer
 	roleRepo role.Repository
 }
 

@@ -12,7 +12,7 @@ import (
 
 type LocalFManHTTPHandler struct {
 	LocalFMan local.FileManagerService
-	Authen authen.Authenticator
+	Authen    authen.Authenticator
 }
 
 func AttachLocalFManHandler(e *echo.Echo, l local.FileManagerService, a authen.Authenticator) {
