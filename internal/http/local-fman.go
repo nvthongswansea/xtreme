@@ -18,22 +18,22 @@ type LocalFManHTTPHandler struct {
 func AttachLocalFManHandler(e *echo.Echo, l local.FileManagerService, a authen.Authenticator) {
 	handler := &LocalFManHTTPHandler{LocalFMan: l, Authen: a}
 	localGroup := e.Group("/local")
-	localGroup.POST("/file", handler.CreateFile)
-	localGroup.POST("/file/upload", handler.UploadFile)
-	localGroup.GET("/file/:id", handler.GetFile)
-	localGroup.PATCH("/file/:id", handler.RenameFile)
-	localGroup.POST("/file/:id/copy", handler.CopyFile)
-	localGroup.PATCH("/file/:id/move", handler.MoveFile)
-	localGroup.GET("/file/:id/download", handler.DownloadFile)
-	localGroup.GET("/file/batch/download", handler.DownloadFileBatch)
-	localGroup.DELETE("/file/:id", handler.SoftRemoveFile)
-	localGroup.DELETE("/file/:id/force", handler.HardRemoveFile)
+	localGroup.POST("/file", handler.createFile)
+	localGroup.POST("/file/upload", handler.uploadFile)
+	localGroup.GET("/file/:id", handler.getFile)
+	localGroup.PATCH("/file/:id", handler.renameFile)
+	localGroup.POST("/file/:id/copy", handler.copyFile)
+	localGroup.PATCH("/file/:id/move", handler.moveFile)
+	localGroup.GET("/file/:id/download", handler.downloadFile)
+	localGroup.GET("/file/batch/download", handler.downloadFileBatch)
+	localGroup.DELETE("/file/:id", handler.softRemoveFile)
+	localGroup.DELETE("/file/:id/force", handler.hardRemoveFile)
 
-	localGroup.POST("/dir", handler.CreateDir)
-	localGroup.GET("/dir/:id", handler.GetDirectory)
+	localGroup.POST("/dir", handler.createDir)
+	localGroup.GET("/dir/:id", handler.getDirectory)
 }
 
-func (l *LocalFManHTTPHandler) UploadFile(c echo.Context) error {
+func (l *LocalFManHTTPHandler) uploadFile(c echo.Context) error {
 	// Get file from form
 	file, err := c.FormFile("file")
 	if err != nil {
@@ -64,7 +64,7 @@ func (l *LocalFManHTTPHandler) UploadFile(c echo.Context) error {
 	)
 }
 
-func (l *LocalFManHTTPHandler) CreateFile(c echo.Context) error {
+func (l *LocalFManHTTPHandler) createFile(c echo.Context) error {
 	request := &models.CreateFileDirRequest{}
 	if err := c.Bind(request); err != nil {
 		return resolveError(err, c, http.StatusBadRequest)
@@ -86,7 +86,7 @@ func (l *LocalFManHTTPHandler) CreateFile(c echo.Context) error {
 	)
 }
 
-func (l *LocalFManHTTPHandler) GetFile(c echo.Context) error {
+func (l *LocalFManHTTPHandler) getFile(c echo.Context) error {
 	fileUUID := c.Param("id")
 	ctx := c.Request().Context()
 	jwtClaims, err := l.Authen.GetDataViaToken(ctx, c.Get("user"))
@@ -100,7 +100,7 @@ func (l *LocalFManHTTPHandler) GetFile(c echo.Context) error {
 	return c.JSON(http.StatusOK, file)
 }
 
-func (l *LocalFManHTTPHandler) CopyFile(c echo.Context) error {
+func (l *LocalFManHTTPHandler) copyFile(c echo.Context) error {
 	fileUUID := c.Param("id")
 	req := &models.CopyMvRequest{}
 	if err := c.Bind(req); err != nil {
@@ -123,7 +123,7 @@ func (l *LocalFManHTTPHandler) CopyFile(c echo.Context) error {
 	)
 }
 
-func (l *LocalFManHTTPHandler) MoveFile(c echo.Context) error {
+func (l *LocalFManHTTPHandler) moveFile(c echo.Context) error {
 	fileUUID := c.Param("id")
 	req := &models.CopyMvRequest{}
 	if err := c.Bind(req); err != nil {
@@ -146,7 +146,7 @@ func (l *LocalFManHTTPHandler) MoveFile(c echo.Context) error {
 	)
 }
 
-func (l *LocalFManHTTPHandler) RenameFile(c echo.Context) error {
+func (l *LocalFManHTTPHandler) renameFile(c echo.Context) error {
 	fileUUID := c.Param("id")
 	req := &models.RenameRequest{}
 	if err := c.Bind(req); err != nil {
@@ -169,7 +169,7 @@ func (l *LocalFManHTTPHandler) RenameFile(c echo.Context) error {
 	)
 }
 
-func (l *LocalFManHTTPHandler) DownloadFile(c echo.Context) error {
+func (l *LocalFManHTTPHandler) downloadFile(c echo.Context) error {
 	fileUUID := c.Param("id")
 	ctx := c.Request().Context()
 	jwtClaims, err := l.Authen.GetDataViaToken(ctx, c.Get("user"))
@@ -190,7 +190,7 @@ func (l *LocalFManHTTPHandler) DownloadFile(c echo.Context) error {
 	return c.Stream(http.StatusOK, echo.MIMEOctetStream, downloadPld.File)
 }
 
-func (l *LocalFManHTTPHandler) DownloadFileBatch(c echo.Context) error {
+func (l *LocalFManHTTPHandler) downloadFileBatch(c echo.Context) error {
 	paramValues := c.Request().URL.Query()
 	fileUUIDList := paramValues["fileUUID"]
 	ctx := c.Request().Context()
@@ -216,7 +216,7 @@ func (l *LocalFManHTTPHandler) DownloadFileBatch(c echo.Context) error {
 	return c.Stream(http.StatusOK, echo.MIMEOctetStream, downloadPld.TmpFile)
 }
 
-func (l *LocalFManHTTPHandler) SoftRemoveFile(c echo.Context) error {
+func (l *LocalFManHTTPHandler) softRemoveFile(c echo.Context) error {
 	fileUUID := c.Param("id")
 	ctx := c.Request().Context()
 	jwtClaims, err := l.Authen.GetDataViaToken(ctx, c.Get("user"))
@@ -235,7 +235,7 @@ func (l *LocalFManHTTPHandler) SoftRemoveFile(c echo.Context) error {
 	)
 }
 
-func (l *LocalFManHTTPHandler) HardRemoveFile(c echo.Context) error {
+func (l *LocalFManHTTPHandler) hardRemoveFile(c echo.Context) error {
 	fileUUID := c.Param("id")
 	ctx := c.Request().Context()
 	jwtClaims, err := l.Authen.GetDataViaToken(ctx, c.Get("user"))
@@ -254,7 +254,7 @@ func (l *LocalFManHTTPHandler) HardRemoveFile(c echo.Context) error {
 	)
 }
 
-func (l *LocalFManHTTPHandler) CreateDir(c echo.Context) error {
+func (l *LocalFManHTTPHandler) createDir(c echo.Context) error {
 	request := &models.CreateFileDirRequest{}
 	if err := c.Bind(request); err != nil {
 		return resolveError(err, c, http.StatusBadRequest)
@@ -276,7 +276,7 @@ func (l *LocalFManHTTPHandler) CreateDir(c echo.Context) error {
 	)
 }
 
-func (l *LocalFManHTTPHandler) GetDirectory(c echo.Context) error {
+func (l *LocalFManHTTPHandler) getDirectory(c echo.Context) error {
 	dirUUID := c.Param("id")
 	ctx := c.Request().Context()
 	jwtClaims, err := l.Authen.GetDataViaToken(ctx, c.Get("user"))
