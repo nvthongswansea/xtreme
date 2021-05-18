@@ -7,10 +7,10 @@ import (
 	"github.com/nvthongswansea/xtreme/internal/models"
 )
 
-// FileManager provides an interface for handling files/directories on local storage service.
-type FileManager interface {
-	// GetUUIDByPath gets a file/directory's UUID by a given path.
-	GetUUIDByPath(ctx context.Context, userUUID, path string) (string, error)
+// FileManagerService provides an interface for handling files/directories on local storage service.
+type FileManagerService interface {
+	// GetDirUUIDByPath gets a directory's UUID by a given path.
+	GetDirUUIDByPath(ctx context.Context, userUUID, path string) (string, error)
 
 	// CreateNewFile creates a new empty file with a given name.
 	// It returns a new file UUID, if success.
@@ -57,7 +57,7 @@ type FileManager interface {
 	DownloadFileBatch(ctx context.Context, userUUID string, fileUUIDs []string) (models.TmpFilePayload, error)
 
 	// Search all files/directories based on given filename within a specific path.
-	SearchByName(ctx context.Context, userUUID, filename, parentDirUUID string) ([]models.File, []models.Directory, error)
+	SearchByName(ctx context.Context, userUUID, filename, parentDirUUID string) ([]models.FileMetadata, []models.DirectoryMetadata, error)
 
 	// Soft remove a file.
 	SoftRemoveFile(ctx context.Context, userUUID, fileUUID string) error

@@ -63,5 +63,5 @@ type FilePayload struct {
 // With *os.File, the temp file can be removed after use.
 type TmpFilePayload struct {
 	Filename string
-	TmpFile  fileUtils.TmpFileHandler
+	TmpFile  fileUtils.FileReadCloseRmer
 }

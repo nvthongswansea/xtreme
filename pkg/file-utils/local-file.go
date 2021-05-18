@@ -21,10 +21,10 @@ type FileSaveReadCpRmer interface {
 	// Read() function. NOTE: Remember to Close() after reading the content.
 	ReadFile(relFilePathOD string) (FileReadCloser, error)
 
-	// GetTmpFileHandler returns an instance of TmpFileHandler.
-	// TmpFileHandler allows reading content of the tmp file, closing tmp file,
+	// GetFileReadCloserRmer returns an instance of FileReadCloseRmer.
+	// FileReadCloseRmer allows reading content of the tmp file, closing tmp file,
 	// and removing the tmp file after use.
-	GetTmpFileHandler(absTmpFilePath string) (TmpFileHandler, error)
+	GetFileReadCloserRmer(absTmpFilePath string) (FileReadCloseRmer, error)
 
 	//// InitAsyncCopyFileBatch
 	//InitAsyncCopyFileBatch(ctx context.Context, copyJobChan chan CopyFileJob) chan CopyFileResult
@@ -50,7 +50,7 @@ func (f *File) GetSize() (int64, error) {
 	return tmpFStat.Size(), nil
 }
 
-type TmpFileHandler interface {
+type FileReadCloseRmer interface {
 	FileReadCloser
 	Remove() error
 }
@@ -108,7 +108,7 @@ func (fs LocalFileOperator) ReadFile(relFilePathOD string) (FileReadCloser, erro
 	return &File{file}, nil
 }
 
-func (fs LocalFileOperator) GetTmpFileHandler(absTmpFilePath string) (TmpFileHandler, error) {
+func (fs LocalFileOperator) GetFileReadCloserRmer(absTmpFilePath string) (FileReadCloseRmer, error) {
 	tmpFile, err := os.Open(absTmpFilePath)
 	if err != nil {
 		return nil, err

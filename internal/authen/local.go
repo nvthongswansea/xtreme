@@ -3,8 +3,8 @@ package authen
 import (
 	"context"
 	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/nvthongswansea/xtreme/internal/database"
 	"github.com/nvthongswansea/xtreme/internal/models"
+	"github.com/nvthongswansea/xtreme/internal/repository/user"
 	"github.com/nvthongswansea/xtreme/pkg/pwd"
 )
 
@@ -16,13 +16,13 @@ const (
 )
 
 type LocalJWTAuthenticator struct {
-	userOps database.UserCreateGetter
-	pwdUtils pwd.BCryptHashComparer
+	userRepo  user.Repository
+	pwdUtils  pwd.BCryptHashComparer
 	jwtSecret string
 }
 
 func (l *LocalJWTAuthenticator) Register(ctx context.Context, username, password string) error {
-	isUsernameExist, err := l.userOps.IsUsernameExist(ctx, username)
+	isUsernameExist, err := l.userRepo.IsUsernameExist(ctx, username)
 	if err != nil {
 		return models.XtremeError{
 			Code:    models.InternalServerErrorCode,
@@ -43,7 +43,7 @@ func (l *LocalJWTAuthenticator) Register(ctx context.Context, username, password
 		}
 	}
 
-	err = l.userOps.CreateNewUser(ctx, username, hashPwd)
+	err = l.userRepo.InsertNewUser(ctx, username, hashPwd)
 	if err != nil {
 		return models.XtremeError{
 			Code:    models.InternalServerErrorCode,
@@ -54,7 +54,7 @@ func (l *LocalJWTAuthenticator) Register(ctx context.Context, username, password
 }
 
 func (l *LocalJWTAuthenticator) Login(ctx context.Context, username, password string) (string, error) {
-	isUsernameExist, err := l.userOps.IsUsernameExist(ctx, username)
+	isUsernameExist, err := l.userRepo.IsUsernameExist(ctx, username)
 	if err != nil {
 		return "", models.XtremeError{
 			Code:    models.InternalServerErrorCode,
@@ -67,7 +67,7 @@ func (l *LocalJWTAuthenticator) Login(ctx context.Context, username, password st
 			Message: incorrectUsernamePwdErrorMessage,
 		}
 	}
-	user, err := l.userOps.GetUserByUsername(ctx, username)
+	user, err := l.userRepo.GetUserByUsername(ctx, username)
 	if err != nil {
 		return "", models.XtremeError{
 			Code:    models.InternalServerErrorCode,
@@ -118,6 +118,6 @@ func (l *LocalJWTAuthenticator) GetDataViaToken(ctx context.Context, token inter
 	return claims, nil
 }
 
-func NewLocalAuthenticator(userOps database.UserCreateGetter, pwdUtils pwd.BCryptHashComparer, jwtSecret string) *LocalJWTAuthenticator {
-	return &LocalJWTAuthenticator{userOps: userOps, pwdUtils: pwdUtils, jwtSecret: jwtSecret}
+func NewLocalAuthenticator(userRepo user.Repository, pwdUtils pwd.BCryptHashComparer, jwtSecret string) *LocalJWTAuthenticator {
+	return &LocalJWTAuthenticator{userRepo: userRepo, pwdUtils: pwdUtils, jwtSecret: jwtSecret}
 }

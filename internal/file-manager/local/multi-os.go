@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"context"
 	"github.com/nvthongswansea/xtreme/internal/author"
-	"github.com/nvthongswansea/xtreme/internal/database"
 	"github.com/nvthongswansea/xtreme/internal/models"
+	"github.com/nvthongswansea/xtreme/internal/repository/directory"
+	"github.com/nvthongswansea/xtreme/internal/repository/file"
 	fileUtils "github.com/nvthongswansea/xtreme/pkg/file-utils"
 	uuidUtils "github.com/nvthongswansea/xtreme/pkg/uuid-utils"
 	log "github.com/sirupsen/logrus"
 	"io"
-	"io/ioutil"
 	"path/filepath"
 )
 
@@ -28,14 +28,28 @@ const (
 	forbiddenOperationErrorMessage = "forbidden operation"
 )
 
-// MultiOSFileManager implements interface local.FileManager.
-// This implementation of local.FileManager supports multiple Operating Systems.
+// MultiOSFileManager implements interface local.FileManagerService.
+// This implementation of local.FileManagerService supports multiple Operating Systems.
 type MultiOSFileManager struct {
-	localFManDBRepo database.LocalFManRepository
+	fileRepo file.Repository
+	dirRepo directory.Repository
 	uuidTool        uuidUtils.UUIDGenerateValidator
 	fileOps         fileUtils.FileSaveReadCpRmer
 	fileCompress    fileUtils.FileCompressor
 	author          author.Authorizer
+}
+
+// NewMultiOSFileManager creates a new MultiOSFileManager.
+func NewMultiOSFileManager(fileRepo file.Repository, dirRepo directory.Repository, uuidTool uuidUtils.UUIDGenerateValidator,
+	fileOps fileUtils.FileSaveReadCpRmer, fileCompress fileUtils.FileCompressor, author author.Authorizer) *MultiOSFileManager {
+	return &MultiOSFileManager{
+		fileRepo,
+		dirRepo,
+		uuidTool,
+		fileOps,
+		fileCompress,
+		author,
+	}
 }
 
 func (m *MultiOSFileManager) GetRootDirectory(ctx context.Context, userUUID string) (models.Directory, error) {
@@ -55,10 +69,9 @@ func (m *MultiOSFileManager) GetRootDirectory(ctx context.Context, userUUID stri
 			Message: invalidUserUUIDErrorMessage,
 		}
 	}
-	// No need to authorize.
-	rooDir, err := m.localFManDBRepo.GetRootDirectory(ctx, userUUID)
+	rooDir, err := m.dirRepo.GetRootDirectoryByUserUUID(ctx, userUUID)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] GetRootDirectory failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] GetRootDirectoryByUserUUID failed with error %s", err.Error())
 		return models.Directory{}, models.XtremeError{
 			Code: models.InternalServerErrorCode,
 			Message: err.Error(),
@@ -67,25 +80,14 @@ func (m *MultiOSFileManager) GetRootDirectory(ctx context.Context, userUUID stri
 	return rooDir, nil
 }
 
-// NewMultiOSFileManager creates a new MultiOSFileManager.
-func NewMultiOSFileManager(localFManDBRepo database.LocalFManRepository, uuidTool uuidUtils.UUIDGenerateValidator,
-	fileOps fileUtils.FileSaveReadCpRmer, fileCompress fileUtils.FileCompressor, author author.Authorizer) *MultiOSFileManager {
-	return &MultiOSFileManager{
-		localFManDBRepo,
-		uuidTool,
-		fileOps,
-		fileCompress,
-		author,
-	}
-}
-func (m *MultiOSFileManager) RenameFile(ctx context.Context, userUUID, fileUUID, newFileName string) error {
+func (m *MultiOSFileManager) RenameFile(ctx context.Context, userUUID, fileUUID, newFilename string) error {
 	// Init logger header
 	logger := log.WithFields(log.Fields{
 		"Loc":         "local-service_handler-multi_os",
 		"Operation":   "RenameFile",
 		"userUUID":    userUUID,
 		"fileUUID":    fileUUID,
-		"newFileName": newFileName,
+		"newFilename": newFilename,
 	})
 	logger.Debug("Start renaming file")
 	defer logger.Debug("Finish renaming file")
@@ -104,7 +106,7 @@ func (m *MultiOSFileManager) RenameFile(ctx context.Context, userUUID, fileUUID,
 			Message: invalidFileUUIDErrorMessage,
 		}
 	}
-	if !fileUtils.IsFilenameOk(newFileName) {
+	if !fileUtils.IsFilenameOk(newFilename) {
 		logger.Info("[-USER-]", invalidFileNameErrorMessage)
 		return models.XtremeError{
 			Code:    models.BadInputErrorCode,
@@ -129,7 +131,7 @@ func (m *MultiOSFileManager) RenameFile(ctx context.Context, userUUID, fileUUID,
 	}
 
 	// Get the source file metadata.
-	srcFile, err := m.localFManDBRepo.GetFileMetadata(ctx, fileUUID)
+	srcFile, err := m.fileRepo.GetFileMetadata(ctx, fileUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetFileMetadata failed with error %s", err.Error())
 		return models.XtremeError{
@@ -138,25 +140,33 @@ func (m *MultiOSFileManager) RenameFile(ctx context.Context, userUUID, fileUUID,
 		}
 	}
 	// Check if the file already exists in a current location in the db.
-	isExist, err := m.localFManDBRepo.IsNameExist(ctx, newFileName, srcFile.ParentUUID)
+	var isExist bool
+	isExist, err = m.fileRepo.IsFilenameExist(ctx, newFilename, srcFile.ParentUUID)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] IsNameExist failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] IsFilenameExist failed with error %s", err.Error())
+		return models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
+	}
+	isExist, err = m.dirRepo.IsDirNameExist(ctx, newFilename, srcFile.ParentUUID)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] IsDirNameExist failed with error %s", err.Error())
 		return models.XtremeError{
 			Code: models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
 	if isExist {
-		logger.Infof("[-USER-] %s already exists in the desired location", newFileName)
+		logger.Infof("[-USER-] %s already exists in the desired location", newFilename)
 		return models.XtremeError{
 			Code:    models.BadInputErrorCode,
 			Message: nameAlreadyExistErrorMessage,
 		}
 	}
-	srcFile.Filename = newFileName
-	err = m.localFManDBRepo.UpdateFileMetadata(ctx, srcFile)
+	err = m.fileRepo.UpdateFilename(ctx, fileUUID, newFilename)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] UpdateFileMetadata failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] UpdateFilename failed with error %s", err.Error())
 		return models.XtremeError{
 			Code: models.InternalServerErrorCode,
 			Message: err.Error(),
@@ -207,7 +217,7 @@ func (m *MultiOSFileManager) SoftRemoveFile(ctx context.Context, userUUID, fileU
 		}
 	}
 
-	err = m.localFManDBRepo.SoftRemoveFile(ctx, fileUUID)
+	err = m.fileRepo.SoftRemoveFile(ctx, fileUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] SoftRemoveFile failed with error %s", err.Error())
 		return models.XtremeError{
@@ -259,7 +269,7 @@ func (m *MultiOSFileManager) HardRemoveFile(ctx context.Context, userUUID, fileU
 		}
 	}
 
-	err = m.localFManDBRepo.HardRemoveFile(ctx, fileUUID, m.fileOps.RemoveFile)
+	err = m.fileRepo.HardRemoveFile(ctx, fileUUID, m.fileOps.RemoveFile)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] HardRemoveFile failed with error %s", err.Error())
 		return models.XtremeError{
@@ -311,9 +321,9 @@ func (m *MultiOSFileManager) GetDirectory(ctx context.Context, userUUID, dirUUID
 		}
 	}
 
-	directory, err := m.localFManDBRepo.GetDirectory(ctx, dirUUID)
+	directory, err := m.dirRepo.GetDirectory(ctx, dirUUID)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] GetDirMetadata failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] GetDirectory failed with error %s", err.Error())
 		return models.Directory{}, models.XtremeError{
 			Code: models.InternalServerErrorCode,
 			Message: err.Error(),
@@ -375,7 +385,7 @@ func (m *MultiOSFileManager) CopyDirectory(ctx context.Context, userUUID, dirUUI
 
 func (m *MultiOSFileManager) copyDirectory(ctx context.Context, logger *log.Entry, userUUID, dirUUID, dstParentDirUUID string) (string, error) {
 	// Get to-be-copied dir metadata.
-	copiedDirMeta, err := m.localFManDBRepo.GetDirMetadata(ctx, dirUUID)
+	copiedDirMeta, err := m.dirRepo.GetDirMetadata(ctx, dirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetDirMetadata failed with error %s", err.Error())
 		return "", models.XtremeError{
@@ -395,9 +405,9 @@ func (m *MultiOSFileManager) copyDirectory(ctx context.Context, logger *log.Entr
 	}
 
 	// Copy files to the newly created directory.
-	childFileMetaList, err := m.localFManDBRepo.GetChildFileMetadataList(ctx, dirUUID)
+	childFileMetaList, err := m.fileRepo.GetFileMetadataListByDir(ctx, dirUUID)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] GetChildFileMetadataList failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] GetFileMetadataListByDir failed with error %s", err.Error())
 		return "", models.XtremeError{
 			Code: models.InternalServerErrorCode,
 			Message: err.Error(),
@@ -415,7 +425,7 @@ func (m *MultiOSFileManager) copyDirectory(ctx context.Context, logger *log.Entr
 	}
 
 	// Get direct child-directories' UUIDs of the current to-be-copied dir.
-	dChildDirUUIDList, err := m.localFManDBRepo.GetDirectChildDirUUIDList(ctx, dirUUID)
+	dChildDirUUIDList, err := m.dirRepo.GetDirectChildDirUUIDList(ctx, dirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetDirectChildDirUUIDList failed with error %s", err.Error())
 		return "", models.XtremeError{
@@ -437,14 +447,14 @@ func (m *MultiOSFileManager) copyDirectory(ctx context.Context, logger *log.Entr
 	return nDirCopyUUID, nil
 }
 
-func (m *MultiOSFileManager) RenameDirectory(ctx context.Context, userUUID, dirUUID, newDirName string) error {
+func (m *MultiOSFileManager) RenameDirectory(ctx context.Context, userUUID, dirUUID, newDirname string) error {
 	// Init logger header
 	logger := log.WithFields(log.Fields{
 		"Loc":        "local-service_handler-multi_os",
 		"Operation":  "RenameDirectory",
 		"userUUID":   userUUID,
 		"dirUUID":    dirUUID,
-		"newDirName": newDirName,
+		"newDirname": newDirname,
 	})
 	logger.Debug("Start renaming directory")
 	defer logger.Debug("Finish renaming directory")
@@ -463,7 +473,7 @@ func (m *MultiOSFileManager) RenameDirectory(ctx context.Context, userUUID, dirU
 			Message: invalidDirUUIDErrorMessage,
 		}
 	}
-	if !fileUtils.IsFilenameOk(newDirName) {
+	if !fileUtils.IsFilenameOk(newDirname) {
 		logger.Info("[-USER-]", invalidFileNameErrorMessage)
 		return models.XtremeError{
 			Code:    models.BadInputErrorCode,
@@ -488,7 +498,7 @@ func (m *MultiOSFileManager) RenameDirectory(ctx context.Context, userUUID, dirU
 	}
 
 	// Get the source directory metadata.
-	dirMeta, err := m.localFManDBRepo.GetDirMetadata(ctx, dirUUID)
+	dirMeta, err := m.dirRepo.GetDirMetadata(ctx, dirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetDirMetadata failed with error %s", err.Error())
 		return models.XtremeError{
@@ -496,33 +506,34 @@ func (m *MultiOSFileManager) RenameDirectory(ctx context.Context, userUUID, dirU
 			Message: err.Error(),
 		}
 	}
-	if (dirMeta == models.DirectoryMetadata{}) {
-		logger.Infof("[-USER-] directory UUID (%s) does not exist", dirUUID)
+	// Check if the name already exists in a current location in the db.
+	var isExist bool
+	isExist, err = m.fileRepo.IsFilenameExist(ctx, newDirname, dirMeta.ParentUUID)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] IsFilenameExist failed with error %s", err.Error())
 		return models.XtremeError{
-			Code:    models.BadInputErrorCode,
-			Message: invalidDirUUIDErrorMessage,
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
 		}
 	}
-	// Check if the name already exists in a current location in the db.
-	isExist, err := m.localFManDBRepo.IsNameExist(ctx, newDirName, dirMeta.ParentUUID)
+	isExist, err = m.dirRepo.IsDirNameExist(ctx, newDirname, dirMeta.ParentUUID)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] IsNameExist failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] IsDirNameExist failed with error %s", err.Error())
 		return models.XtremeError{
 			Code: models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
 	if isExist {
-		logger.Infof("[-USER-] %s already exists in the desired location", newDirName)
+		logger.Infof("[-USER-] %s already exists in the desired location", newDirname)
 		return models.XtremeError{
 			Code:    models.BadInputErrorCode,
 			Message: nameAlreadyExistErrorMessage,
 		}
 	}
-	dirMeta.Dirname = newDirName
-	err = m.localFManDBRepo.UpdateDirMetadata(ctx, dirMeta)
+	err = m.dirRepo.UpdateDirname(ctx, dirUUID, newDirname)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] UpdateDirMetadata failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] UpdateDirname failed with error %s", err.Error())
 		return models.XtremeError{
 			Code: models.InternalServerErrorCode,
 			Message: err.Error(),
@@ -581,7 +592,7 @@ func (m *MultiOSFileManager) MoveDirectory(ctx context.Context, userUUID, dirUUI
 	}
 
 	// Get the directory metadata.
-	dirMeta, err := m.localFManDBRepo.GetDirMetadata(ctx, dirUUID)
+	dirMeta, err := m.dirRepo.GetDirMetadata(ctx, dirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetDirMetadata failed with error %s", err.Error())
 		return "", models.XtremeError{
@@ -590,9 +601,18 @@ func (m *MultiOSFileManager) MoveDirectory(ctx context.Context, userUUID, dirUUI
 		}
 	}
 	// Check if the directory name already exists in a desired location in the db.
-	isExist, err := m.localFManDBRepo.IsNameExist(ctx, dirMeta.Dirname, dstParentDirUUID)
+	var isExist bool
+	isExist, err = m.fileRepo.IsFilenameExist(ctx, dirMeta.Dirname, dirMeta.ParentUUID)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] IsNameExist failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] IsFilenameExist failed with error %s", err.Error())
+		return "",models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
+	}
+	isExist, err = m.dirRepo.IsDirNameExist(ctx, dirMeta.Dirname, dirMeta.ParentUUID)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] IsDirNameExist failed with error %s", err.Error())
 		return "", models.XtremeError{
 			Code: models.InternalServerErrorCode,
 			Message: err.Error(),
@@ -605,10 +625,9 @@ func (m *MultiOSFileManager) MoveDirectory(ctx context.Context, userUUID, dirUUI
 			Message: nameAlreadyExistErrorMessage,
 		}
 	}
-	dirMeta.ParentUUID = dstParentDirUUID
-	err = m.localFManDBRepo.UpdateDirMetadata(ctx, dirMeta)
+	err = m.dirRepo.UpdateParentDirUUID(ctx, dirUUID, dstParentDirUUID)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] UpdateDirMetadata failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] UpdateParentDirUUID failed with error %s", err.Error())
 		return "", models.XtremeError{
 			Code: models.InternalServerErrorCode,
 			Message: err.Error(),
@@ -659,7 +678,7 @@ func (m *MultiOSFileManager) DownloadDirectory(ctx context.Context, userUUID, di
 	}
 
 	// Get dir metadata.
-	dirMeta, err := m.localFManDBRepo.GetDirMetadata(ctx, dirUUID)
+	dirMeta, err := m.dirRepo.GetDirMetadata(ctx, dirUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetDirMetadata failed with error %s", err.Error())
 		return models.TmpFilePayload{}, models.XtremeError{
@@ -669,9 +688,9 @@ func (m *MultiOSFileManager) DownloadDirectory(ctx context.Context, userUUID, di
 	}
 
 	// Get all child-files metadata.
-	fileMetadataList, err := m.localFManDBRepo.GetChildFileMetadataList(ctx, dirUUID)
+	fileMetadataList, err := m.fileRepo.GetFileMetadataListByDir(ctx, dirUUID)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] GetChildFileMetadataList failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] GetFileMetadataListByDir failed with error %s", err.Error())
 		return models.TmpFilePayload{}, models.XtremeError{
 			Code: models.InternalServerErrorCode,
 			Message: err.Error(),
@@ -684,9 +703,9 @@ func (m *MultiOSFileManager) DownloadDirectory(ctx context.Context, userUUID, di
 		if err != nil {
 			logger.Errorf("[-INTERNAL-] filepath.Rel failed with error %s", err.Error())
 			return models.TmpFilePayload{}, models.XtremeError{
-			Code: models.InternalServerErrorCode,
-			Message: err.Error(),
-		}
+				Code: models.InternalServerErrorCode,
+				Message: err.Error(),
+			}
 		}
 		inZipPaths[relPath] = childFileMeta.RelPathOnDisk
 	}
@@ -698,9 +717,9 @@ func (m *MultiOSFileManager) DownloadDirectory(ctx context.Context, userUUID, di
 			Message: err.Error(),
 		}
 	}
-	tmpFHanlder, err := m.fileOps.GetTmpFileHandler(tmpFilePath)
+	tmpFHanlder, err := m.fileOps.GetFileReadCloserRmer(tmpFilePath)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] GetTmpFileHandler failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] GetFileReadCloserRmer failed with error %s", err.Error())
 		return models.TmpFilePayload{}, models.XtremeError{
 			Code: models.InternalServerErrorCode,
 			Message: err.Error(),
@@ -755,9 +774,9 @@ func (m *MultiOSFileManager) SoftRemoveDir(ctx context.Context, userUUID, dirUUI
 		}
 	}
 
-	err = m.localFManDBRepo.SoftRemoveDir(ctx, dirUUID)
+	err = m.dirRepo.SoftRemoveDir(ctx, dirUUID)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] SoftRemoveFile failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] SoftRemoveDir failed with error %s", err.Error())
 		return models.XtremeError{
 			Code: models.InternalServerErrorCode,
 			Message: err.Error(),
@@ -808,9 +827,9 @@ func (m *MultiOSFileManager) HardRemoveDir(ctx context.Context, userUUID, dirUUI
 		}
 	}
 
-	err = m.localFManDBRepo.HardRemoveDir(ctx, dirUUID, m.fileOps.RemoveFile)
+	err = m.dirRepo.HardRemoveDir(ctx, dirUUID, m.fileOps.RemoveFile)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] SoftRemoveFile failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] HardRemoveDir failed with error %s", err.Error())
 		return models.XtremeError{
 			Code: models.InternalServerErrorCode,
 			Message: err.Error(),
@@ -819,11 +838,11 @@ func (m *MultiOSFileManager) HardRemoveDir(ctx context.Context, userUUID, dirUUI
 	return nil
 }
 
-func (m *MultiOSFileManager) GetUUIDByPath(ctx context.Context, userUUID, path string) (string, error) {
+func (m *MultiOSFileManager) GetDirUUIDByPath(ctx context.Context, userUUID, path string) (string, error) {
 	// Init logger header
 	logger := log.WithFields(log.Fields{
 		"Loc":       "local-service_handler-multi_os",
-		"Operation": "GetUUIDByPath",
+		"Operation": "GetDirUUIDByPath",
 		"userUUID":  userUUID,
 		"path":      path,
 	})
@@ -845,19 +864,9 @@ func (m *MultiOSFileManager) GetUUIDByPath(ctx context.Context, userUUID, path s
 			Message: invalidPathErrorMessage,
 		}
 	}
-	// Get root dir metadata of the user
-	rootDirMeta, err := m.localFManDBRepo.GetRootDirMetadata(ctx, userUUID)
+	uuid, err := m.dirRepo.GetDirUUIDByPath(ctx, userUUID, path)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] GetUUIDByPath failed with error %s", err.Error())
-		return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
-			Message: err.Error(),
-		}
-	}
-
-	uuid, isDir, err := m.localFManDBRepo.GetUUIDByPath(ctx, rootDirMeta.UUID, path)
-	if err != nil {
-		logger.Errorf("[-INTERNAL-] GetUUIDByPath failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] GetDirUUIDByPath failed with error %s", err.Error())
 		return "", models.XtremeError{
 			Code: models.InternalServerErrorCode,
 			Message: err.Error(),
@@ -868,43 +877,6 @@ func (m *MultiOSFileManager) GetUUIDByPath(ctx context.Context, userUUID, path s
 		return "", models.XtremeError{
 			Code:    models.BadInputErrorCode,
 			Message: pathNotFoundMessage,
-		}
-	}
-	// Authorization. Note: Since we only
-	// know if the user has permission to view this UUID
-	// after retrieving the UUID, the authorization is executed
-	// at last.
-	if isDir {
-		isAuthorized, err := m.author.AuthorizeActionsOnDir(ctx, userUUID, uuid, author.ViewDirAction)
-		if err != nil {
-			logger.Errorf("[-INTERNAL-] AuthorizeActionsOnDir failed with error %s", err.Error())
-			return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
-			Message: err.Error(),
-		}
-		}
-		if !isAuthorized {
-			logger.Info(forbiddenOperationErrorMessage)
-			return "", models.XtremeError{
-			Code:    models.ForbiddenOperationErrorCode,
-			Message: forbiddenOperationErrorMessage,
-		}
-		}
-		return uuid, nil
-	}
-	isAuthorized, err := m.author.AuthorizeActionsOnFile(ctx, userUUID, uuid, author.ViewFileAction)
-	if err != nil {
-		logger.Errorf("[-INTERNAL-] AuthorizeActionsOnFile failed with error %s", err.Error())
-		return "", models.XtremeError{
-			Code: models.InternalServerErrorCode,
-			Message: err.Error(),
-		}
-	}
-	if !isAuthorized {
-		logger.Info(forbiddenOperationErrorMessage)
-		return "", models.XtremeError{
-			Code:    models.ForbiddenOperationErrorCode,
-			Message: forbiddenOperationErrorMessage,
 		}
 	}
 	return uuid, nil
@@ -923,9 +895,7 @@ func (m *MultiOSFileManager) CreateNewFile(ctx context.Context, userUUID, filena
 	logger.Debug("Start creating a new file")
 	defer logger.Debug("Finish creating a new file")
 	emptyBytes := make([]byte, 0) // Create an empty byte slice
-	// Create a new Reader
-	contentReadCloser := ioutil.NopCloser(bytes.NewReader(emptyBytes))
-	return m.UploadFile(ctx, userUUID, filename, parentDirUUID, contentReadCloser)
+	return m.UploadFile(ctx, userUUID, filename, parentDirUUID, bytes.NewReader(emptyBytes))
 }
 
 func (m *MultiOSFileManager) UploadFile(ctx context.Context, userUUID, filename, parentDirUUID string, contentReader io.Reader) (string, error) {
@@ -978,15 +948,24 @@ func (m *MultiOSFileManager) UploadFile(ctx context.Context, userUUID, filename,
 	}
 
 	// Check if the file already exists in a desired location in the db.
-	isFilenameExist, err := m.localFManDBRepo.IsNameExist(ctx, filename, parentDirUUID)
+	var isExist bool
+	isExist, err = m.fileRepo.IsFilenameExist(ctx, filename, parentDirUUID)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] IsNameExist failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] IsFilenameExist failed with error %s", err.Error())
 		return "", models.XtremeError{
 			Code: models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
-	if isFilenameExist {
+	isExist, err = m.dirRepo.IsDirNameExist(ctx, filename, parentDirUUID)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] IsDirNameExist failed with error %s", err.Error())
+		return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
+	}
+	if isExist {
 		logger.Infof("[-USER-] %s already exists in the desired location", filename)
 		return "", models.XtremeError{
 			Code:    models.BadInputErrorCode,
@@ -1006,26 +985,28 @@ func (m *MultiOSFileManager) UploadFile(ctx context.Context, userUUID, filename,
 			Message: err.Error(),
 		}
 	}
-	newFileMetadata := models.FileMetadata{
-		UUID:          newFileUUID,
-		Filename:      filename,
-		RelPathOnDisk: relPathOD,
-		ParentUUID:    parentDirUUID,
-		Size:          size,
-		OwnerUUID:     userUUID,
+	newFile := models.File{
+		Metadata: models.FileMetadata{
+			UUID:          newFileUUID,
+			Filename:      filename,
+			RelPathOnDisk: relPathOD,
+			ParentUUID:    parentDirUUID,
+			Size:          size,
+			OwnerUUID:     userUUID,
+		},
 	}
 	// Insert new file metadata to the DB.
-	if err := m.localFManDBRepo.InsertFileMetadata(ctx, newFileMetadata); err != nil {
+	if err := m.fileRepo.InsertFile(ctx, newFile); err != nil {
 		// If error presents while inserting a new record,
 		// remove the file from the storage.
 		defer func() {
-			logger.Debugf("Removing file %s due to InsertFileMetadata error %s", newFileUUID, err.Error())
+			logger.Debugf("Removing file %s due to InsertFile error %s", newFileUUID, err.Error())
 			err = m.fileOps.RemoveFile(newFileUUID)
 			if err != nil {
 				logger.Errorf("[-INTERNAL-] RemoveFile failed with error %s", err.Error())
 			}
 		}()
-		logger.Errorf("[-INTERNAL-] InsertFileMetadata failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] InsertFile failed with error %s", err.Error())
 		return "", models.XtremeError{
 			Code: models.InternalServerErrorCode,
 			Message: err.Error(),
@@ -1102,7 +1083,7 @@ func (m *MultiOSFileManager) CopyFile(ctx context.Context, userUUID, fileUUID, d
 
 func (m *MultiOSFileManager) copyFile(ctx context.Context, logger *log.Entry, userUUID, fileUUID, dstParentDirUUID string) (string, error) {
 	// Get the source file metadata.
-	srcFile, err := m.localFManDBRepo.GetFileMetadata(ctx, fileUUID)
+	srcFile, err := m.fileRepo.GetFileMetadata(ctx, fileUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetFileMetadata failed with error %s", err.Error())
 		return "", models.XtremeError{
@@ -1111,9 +1092,18 @@ func (m *MultiOSFileManager) copyFile(ctx context.Context, logger *log.Entry, us
 		}
 	}
 	// Check if the file already exists in a desired location in the db.
-	isExist, err := m.localFManDBRepo.IsNameExist(ctx, srcFile.Filename, dstParentDirUUID)
+	var isExist bool
+	isExist, err = m.fileRepo.IsFilenameExist(ctx, srcFile.Filename, dstParentDirUUID)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] IsNameExist failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] IsFilenameExist failed with error %s", err.Error())
+		return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
+	}
+	isExist, err = m.dirRepo.IsDirNameExist(ctx, srcFile.Filename, dstParentDirUUID)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] IsDirNameExist failed with error %s", err.Error())
 		return "", models.XtremeError{
 			Code: models.InternalServerErrorCode,
 			Message: err.Error(),
@@ -1150,26 +1140,28 @@ func (m *MultiOSFileManager) copyFile(ctx context.Context, logger *log.Entry, us
 			Message: err.Error(),
 		}
 	}
-	newFileMetadata := models.FileMetadata{
-		UUID:          newFileUUID,
-		Filename:      srcFile.Filename,
-		RelPathOnDisk: relDstPathOD,
-		ParentUUID:    dstParentDirUUID,
-		Size:          size,
-		OwnerUUID:     userUUID, // other user can copy the owner's file (if permitted)
+	newFile := models.File{
+		Metadata: models.FileMetadata{
+			UUID:          newFileUUID,
+			Filename:      srcFile.Filename,
+			RelPathOnDisk: relDstPathOD,
+			ParentUUID:    dstParentDirUUID,
+			Size:          size,
+			OwnerUUID:     userUUID, // other user can copy the owner's file (if permitted)
+		},
 	}
 	// Insert a new file metadata to the DB.
-	if err = m.localFManDBRepo.InsertFileMetadata(ctx, newFileMetadata); err != nil {
+	if err = m.fileRepo.InsertFile(ctx, newFile); err != nil {
 		// If error presents while inserting a new record,
 		// remove the file from the storage.
 		defer func() {
-			logger.Debugf("Removing file %s due to InsertFileMetadata error %s", newFileUUID, err.Error())
+			logger.Debugf("Removing file %s due to InsertFile error %s", newFileUUID, err.Error())
 			err = m.fileOps.RemoveFile(newFileUUID)
 			if err != nil {
 				logger.Errorf("[-INTERNAL-] RemoveFile failed with error %s", err.Error())
 			}
 		}()
-		logger.Errorf("[-INTERNAL-] InsertFileMetadata failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] InsertFile failed with error %s", err.Error())
 		return "", models.XtremeError{
 			Code: models.InternalServerErrorCode,
 			Message: err.Error(),
@@ -1243,7 +1235,7 @@ func (m *MultiOSFileManager) MoveFile(ctx context.Context, userUUID, fileUUID, d
 	}
 
 	// Get the file metadata.
-	srcFile, err := m.localFManDBRepo.GetFileMetadata(ctx, fileUUID)
+	srcFile, err := m.fileRepo.GetFileMetadata(ctx, fileUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetFileMetadata failed with error %s", err.Error())
 		return models.XtremeError{
@@ -1252,9 +1244,18 @@ func (m *MultiOSFileManager) MoveFile(ctx context.Context, userUUID, fileUUID, d
 		}
 	}
 	// Check if the file already exists in a desired location in the db.
-	isExist, err := m.localFManDBRepo.IsNameExist(ctx, srcFile.Filename, dstParentDirUUID)
+	var isExist bool
+	isExist, err = m.fileRepo.IsFilenameExist(ctx, srcFile.Filename, dstParentDirUUID)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] IsNameExist failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] IsFilenameExist failed with error %s", err.Error())
+		return models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
+	}
+	isExist, err = m.dirRepo.IsDirNameExist(ctx, srcFile.Filename, dstParentDirUUID)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] IsDirNameExist failed with error %s", err.Error())
 		return models.XtremeError{
 			Code: models.InternalServerErrorCode,
 			Message: err.Error(),
@@ -1267,10 +1268,9 @@ func (m *MultiOSFileManager) MoveFile(ctx context.Context, userUUID, fileUUID, d
 			Message: nameAlreadyExistErrorMessage,
 		}
 	}
-	srcFile.ParentUUID = dstParentDirUUID
-	err = m.localFManDBRepo.UpdateFileMetadata(ctx, srcFile)
+	err = m.fileRepo.UpdateParentDirUUID(ctx, fileUUID, dstParentDirUUID)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] UpdateFileMetadata failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] UpdateParentDirUUID failed with error %s", err.Error())
 		return models.XtremeError{
 			Code: models.InternalServerErrorCode,
 			Message: err.Error(),
@@ -1321,7 +1321,7 @@ func (m *MultiOSFileManager) GetFile(ctx context.Context, userUUID, fileUUID str
 	}
 
 	// Get the file metadata.
-	srcFile, err := m.localFManDBRepo.GetFile(ctx, fileUUID)
+	srcFile, err := m.fileRepo.GetFile(ctx, fileUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetFile failed with error %s", err.Error())
 		return models.File{}, models.XtremeError{
@@ -1374,7 +1374,7 @@ func (m *MultiOSFileManager) DownloadFile(ctx context.Context, userUUID, fileUUI
 	}
 
 	// Get the file metadata.
-	srcFile, err := m.localFManDBRepo.GetFileMetadata(ctx, fileUUID)
+	srcFile, err := m.fileRepo.GetFileMetadata(ctx, fileUUID)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetFileMetadata failed with error %s", err.Error())
 		return models.FilePayload{}, models.XtremeError{
@@ -1442,7 +1442,7 @@ func (m *MultiOSFileManager) DownloadFileBatch(ctx context.Context, userUUID str
 		}
 	}
 	// Get the files' metadata.
-	srcFiles, err := m.localFManDBRepo.GetFileMetadataBatch(ctx, fileUUIDs)
+	srcFiles, err := m.fileRepo.GetFileMetadataBatch(ctx, fileUUIDs)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] GetFileMetadataBatch failed with error %s", err.Error())
 		return models.TmpFilePayload{}, models.XtremeError{
@@ -1462,9 +1462,9 @@ func (m *MultiOSFileManager) DownloadFileBatch(ctx context.Context, userUUID str
 			Message: err.Error(),
 		}
 	}
-	tmpFHanlder, err := m.fileOps.GetTmpFileHandler(tmpFilePath)
+	tmpFile, err := m.fileOps.GetFileReadCloserRmer(tmpFilePath)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] GetTmpFileHandler failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] GetFileReadCloserRmer failed with error %s", err.Error())
 		return models.TmpFilePayload{}, models.XtremeError{
 			Code: models.InternalServerErrorCode,
 			Message: err.Error(),
@@ -1472,12 +1472,12 @@ func (m *MultiOSFileManager) DownloadFileBatch(ctx context.Context, userUUID str
 	}
 	payload := models.TmpFilePayload{
 		Filename: filepath.Base(tmpFilePath),
-		TmpFile:  tmpFHanlder,
+		TmpFile:  tmpFile,
 	}
 	return payload, nil
 }
 
-func (m *MultiOSFileManager) SearchByName(ctx context.Context, userUUID, filename, parentDirUUID string) ([]models.File, []models.Directory, error) {
+func (m *MultiOSFileManager) SearchByName(ctx context.Context, userUUID, filename, parentDirUUID string) ([]models.FileMetadata, []models.DirectoryMetadata, error) {
 	// Init logger header
 	logger := log.WithFields(log.Fields{
 		"Loc":           "local-service_handler-multi_os",
@@ -1526,15 +1526,23 @@ func (m *MultiOSFileManager) SearchByName(ctx context.Context, userUUID, filenam
 		}
 	}
 
-	files, dirs, err := m.localFManDBRepo.SearchByName(ctx, userUUID, filename, parentDirUUID)
+	fileMetadataList, err := m.fileRepo.GetFileMetadataListByName(ctx, filename, parentDirUUID)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] GetUUIDByPath failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] GetFileMetadataListByName failed with error %s", err.Error())
 		return nil, nil, models.XtremeError{
 			Code: models.InternalServerErrorCode,
 			Message: err.Error(),
 		}
 	}
-	return files, dirs, nil
+	dirMetadataList, err := m.dirRepo.GetDirMetadataListByName(ctx, filename, parentDirUUID)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] GetDirMetadataListByName failed with error %s", err.Error())
+		return nil, nil, models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
+	}
+	return fileMetadataList, dirMetadataList, nil
 }
 
 func (m *MultiOSFileManager) CreateNewDirectory(ctx context.Context, userUUID, dirname, parentDirUUID string) (string, error) {
@@ -1585,15 +1593,24 @@ func (m *MultiOSFileManager) CreateNewDirectory(ctx context.Context, userUUID, d
 			Message: forbiddenOperationErrorMessage,
 		}
 	}
-
 	return m.createNewDirectory(ctx, logger, userUUID, dirname, parentDirUUID)
 }
 
 func (m *MultiOSFileManager) createNewDirectory(ctx context.Context, logger *log.Entry, userUUID, dirname, parentDirUUID string) (string, error) {
 	// Check if the directory already exists in a desired location in the db.
-	isExist, err := m.localFManDBRepo.IsNameExist(ctx, dirname, parentDirUUID)
+	var isExist bool
+	var err error
+	isExist, err = m.fileRepo.IsFilenameExist(ctx, dirname, parentDirUUID)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] IsNameExist failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] IsFilenameExist failed with error %s", err.Error())
+		return "", models.XtremeError{
+			Code: models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
+	}
+	isExist, err = m.dirRepo.IsDirNameExist(ctx, dirname, parentDirUUID)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] IsDirNameExist failed with error %s", err.Error())
 		return "", models.XtremeError{
 			Code: models.InternalServerErrorCode,
 			Message: err.Error(),
@@ -1616,9 +1633,9 @@ func (m *MultiOSFileManager) createNewDirectory(ctx context.Context, logger *log
 		ParentUUID: parentDirUUID,
 		OwnerUUID:  userUUID,
 	}
-	err = m.localFManDBRepo.InsertDirectoryMetadata(ctx, newDirMetadata)
+	err = m.dirRepo.InsertDirectoryMetadata(ctx, newDirMetadata)
 	if err != nil {
-		logger.Errorf("[-INTERNAL-] InsertDirRecord failed with error %s", err.Error())
+		logger.Errorf("[-INTERNAL-] InsertDirectoryMetadata failed with error %s", err.Error())
 		return "", models.XtremeError{
 			Code: models.InternalServerErrorCode,
 			Message: err.Error(),

@@ -11,11 +11,11 @@ import (
 )
 
 type LocalFManHTTPHandler struct {
-	LocalFMan local.FileManager
+	LocalFMan local.FileManagerService
 	Authen authen.Authenticator
 }
 
-func AttachLocalFManHandler(e *echo.Echo, l local.FileManager, a authen.Authenticator) {
+func AttachLocalFManHandler(e *echo.Echo, l local.FileManagerService, a authen.Authenticator) {
 	handler := &LocalFManHTTPHandler{LocalFMan: l, Authen: a}
 	localGroup := e.Group("/local")
 	localGroup.POST("/file", handler.CreateFile)

@@ -3,27 +3,27 @@ package author
 import (
 	"context"
 	"github.com/casbin/casbin/v2"
-	"github.com/nvthongswansea/xtreme/internal/database"
+	"github.com/nvthongswansea/xtreme/internal/repository/role"
 )
 
 // CasbinAuthorizer is a casbin implementation of
 // the interface Authorizer.
 type CasbinAuthorizer struct {
 	enforcer   *casbin.Enforcer
-	roleGetter database.UserRoleByEntityGetter
+	roleRepo role.Repository
 }
 
 // NewCasbinAuthorizer create a new casbin enforcer from model filepath
 // and policy filepath.
-func NewCasbinAuthorizer(modelPath, policyPath string, roleGetter database.UserRoleByEntityGetter) (*CasbinAuthorizer, error) {
+func NewCasbinAuthorizer(modelPath, policyPath string, roleRepo role.Repository) (*CasbinAuthorizer, error) {
 	enforcer, err := casbin.NewEnforcer(modelPath, policyPath)
-	return &CasbinAuthorizer{enforcer, roleGetter}, err
+	return &CasbinAuthorizer{enforcer, roleRepo}, err
 }
 
 // AuthorizeActionsOnFile checks if a user has a right to perform some actions on a certain file.
 func (c *CasbinAuthorizer) AuthorizeActionsOnFile(ctx context.Context, userUUID, fileUUID string, actions ...fileAction) (bool, error) {
 	// Get user role.
-	role, err := c.roleGetter.GetUserRoleByFile(ctx, userUUID, fileUUID)
+	role, err := c.roleRepo.GetUserRoleByFile(ctx, userUUID, fileUUID)
 	if err != nil {
 		return false, err
 	}
@@ -42,7 +42,7 @@ func (c *CasbinAuthorizer) AuthorizeActionsOnFile(ctx context.Context, userUUID,
 // AuthorizeActionsOnDir checks if a user has a right to perform some actions on a certain directory.
 func (c *CasbinAuthorizer) AuthorizeActionsOnDir(ctx context.Context, userUUID, dirUUID string, actions ...dirAction) (bool, error) {
 	// Get user role.
-	role, err := c.roleGetter.GetUserRoleByDirectory(ctx, userUUID, dirUUID)
+	role, err := c.roleRepo.GetUserRoleByDirectory(ctx, userUUID, dirUUID)
 	if err != nil {
 		return false, err
 	}
