@@ -48,6 +48,14 @@ func (fc *FileCreate) SetPath(s string) *FileCreate {
 	return fc
 }
 
+// SetNillablePath sets the "path" field if the given value is not nil.
+func (fc *FileCreate) SetNillablePath(s *string) *FileCreate {
+	if s != nil {
+		fc.SetPath(*s)
+	}
+	return fc
+}
+
 // SetRelPathOnDisk sets the "rel_path_on_disk" field.
 func (fc *FileCreate) SetRelPathOnDisk(s string) *FileCreate {
 	fc.mutation.SetRelPathOnDisk(s)
@@ -185,6 +193,10 @@ func (fc *FileCreate) defaults() {
 	if _, ok := fc.mutation.MimeType(); !ok {
 		v := file.DefaultMimeType
 		fc.mutation.SetMimeType(v)
+	}
+	if _, ok := fc.mutation.Path(); !ok {
+		v := file.DefaultPath
+		fc.mutation.SetPath(v)
 	}
 	if _, ok := fc.mutation.IsDeleted(); !ok {
 		v := file.DefaultIsDeleted

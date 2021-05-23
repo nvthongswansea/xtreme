@@ -29,7 +29,7 @@ func (c *CasbinAuthorizer) AuthorizeActionsOnFile(ctx context.Context, tx transa
 		return false, err
 	}
 	for _, action := range actions {
-		isAllowed, err := c.enforcer.Enforce(role, "file", action)
+		isAllowed, err := c.enforcer.Enforce(role, "file", string(action))
 		if err != nil {
 			return false, err
 		}
@@ -48,7 +48,7 @@ func (c *CasbinAuthorizer) AuthorizeActionsOnDir(ctx context.Context, tx transac
 		return false, err
 	}
 	for _, action := range actions {
-		isAllowed, err := c.enforcer.Enforce(role, "directory", action)
+		isAllowed, err := c.enforcer.Enforce(role, "directory", string(action))
 		if err != nil {
 			return false, err
 		}

@@ -12,7 +12,7 @@ var (
 	DirectoriesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString, Unique: true},
 		{Name: "name", Type: field.TypeString},
-		{Name: "path", Type: field.TypeString},
+		{Name: "path", Type: field.TypeString, Default: ""},
 		{Name: "is_deleted", Type: field.TypeBool, Default: false},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -51,7 +51,7 @@ var (
 		{Name: "id", Type: field.TypeString, Unique: true},
 		{Name: "name", Type: field.TypeString},
 		{Name: "mime_type", Type: field.TypeString, Default: "unknown"},
-		{Name: "path", Type: field.TypeString},
+		{Name: "path", Type: field.TypeString, Default: ""},
 		{Name: "rel_path_on_disk", Type: field.TypeString, Unique: true},
 		{Name: "size", Type: field.TypeInt64},
 		{Name: "is_deleted", Type: field.TypeBool, Default: false},

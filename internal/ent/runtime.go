@@ -21,6 +21,10 @@ func init() {
 	directoryDescName := directoryFields[1].Descriptor()
 	// directory.NameValidator is a validator for the "name" field. It is called by the builders before save.
 	directory.NameValidator = directoryDescName.Validators[0].(func(string) error)
+	// directoryDescPath is the schema descriptor for path field.
+	directoryDescPath := directoryFields[2].Descriptor()
+	// directory.DefaultPath holds the default value on creation for the path field.
+	directory.DefaultPath = directoryDescPath.Default.(string)
 	// directoryDescIsDeleted is the schema descriptor for is_deleted field.
 	directoryDescIsDeleted := directoryFields[3].Descriptor()
 	// directory.DefaultIsDeleted holds the default value on creation for the is_deleted field.
@@ -49,6 +53,10 @@ func init() {
 	fileDescMimeType := fileFields[2].Descriptor()
 	// file.DefaultMimeType holds the default value on creation for the mime_type field.
 	file.DefaultMimeType = fileDescMimeType.Default.(string)
+	// fileDescPath is the schema descriptor for path field.
+	fileDescPath := fileFields[3].Descriptor()
+	// file.DefaultPath holds the default value on creation for the path field.
+	file.DefaultPath = fileDescPath.Default.(string)
 	// fileDescRelPathOnDisk is the schema descriptor for rel_path_on_disk field.
 	fileDescRelPathOnDisk := fileFields[4].Descriptor()
 	// file.RelPathOnDiskValidator is a validator for the "rel_path_on_disk" field. It is called by the builders before save.

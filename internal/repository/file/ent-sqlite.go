@@ -22,17 +22,26 @@ func NewEntSQLFileRepo(client *ent.Client, uuidTool uuidUtils.UUIDGenerator) Ent
 	}
 }
 
-func (e EntSQLFileRepo) InsertFile(ctx context.Context, tx transaction.RollbackCommitter, newFile models.File) (string, error) {
+func (e EntSQLFileRepo) InsertFile(ctx context.Context, tx transaction.RollbackCommitter, newFile models.File, saveFileFn SaveFileToDiskFn) (string, error) {
 	client := e.client
 	if tx != nil {
 		client = tx.(*ent.Tx).Client()
 	}
+	newUUID := e.uuidTool.NewUUID()
+	relPathOD := newUUID
+	size, err := saveFileFn(relPathOD)
+	if err != nil {
+		return "", err
+	}
 	f, err := client.File.
 		Create().
-		SetID(e.uuidTool.NewUUID()).
+		SetID(newUUID).
 		SetName(newFile.Metadata.Filename).
 		SetOwnerID(newFile.Metadata.OwnerUUID).
 		SetParentID(newFile.Metadata.ParentUUID).
+		SetRelPathOnDisk(relPathOD).
+		SetSize(size).
+		SetPath(newFile.Metadata.Path).
 		Save(ctx)
 	if err != nil {
 		return "", err

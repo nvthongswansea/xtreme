@@ -18,10 +18,10 @@ import (
 const (
 	invalidDirNameErrorMessage       = "directory name is invalid"
 	invalidFileNameErrorMessage      = "filename is invalid"
-	invalidUserUUIDErrorMessage      = "user UserUUID is not valid"
-	invalidParentDirUUIDErrorMessage = "parent directory UserUUID is not valid"
-	invalidFileUUIDErrorMessage      = "file UserUUID is not valid"
-	invalidDirUUIDErrorMessage       = "file UserUUID is not valid"
+	invalidUserUUIDErrorMessage      = "user UUID is not valid"
+	invalidParentDirUUIDErrorMessage = "parent directory UUID is not valid"
+	invalidFileUUIDErrorMessage      = "file UUID is not valid"
+	invalidDirUUIDErrorMessage       = "directory UUID is not valid"
 	invalidPathErrorMessage          = "path is not valid"
 
 	pathNotFoundMessage            = "path not found"
@@ -168,16 +168,41 @@ func (m *MultiOSFileManager) UploadFile(ctx context.Context, userUUID, filename,
 		}
 		return "", err
 	}
+	// Save file to the local storage.
+	saveFileFn := func(filepath string) (int64, error) {
+		size, err := m.fileOps.SaveFile(filepath, contentReader)
+		if err != nil {
+			logger.Errorf("[-INTERNAL-] SaveFile failed with error %s", err.Error())
+			err = models.XtremeError{
+				Code:    models.InternalServerErrorCode,
+				Message: err.Error(),
+			}
+			return 0, err
+		}
+		return size, nil
+	}
 
+	// Get path of the parent dir UUID
+	parentDirMeta, err := m.dirRepo.GetDirMetadata(ctx, tx, parentDirUUID)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] GetDirMetadata failed with error %s", err.Error())
+		err = models.XtremeError{
+			Code:    models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
+		return "", err
+	}
 	newFile := models.File{
 		Metadata: models.FileMetadata{
 			Filename:   filename,
 			ParentUUID: parentDirUUID,
 			OwnerUUID:  userUUID,
+			Path:       filepath.Join(parentDirMeta.Path, filename),
 		},
 	}
-	fUUID, err := m.fileRepo.InsertFile(ctx, tx, newFile)
+	fUUID, err := m.fileRepo.InsertFile(ctx, tx, newFile, saveFileFn)
 	if err != nil {
+		logger.Errorf("[-INTERNAL-] InsertFile failed with error %s", err.Error())
 		err = models.XtremeError{
 			Code:    models.InternalServerErrorCode,
 			Message: err.Error(),
@@ -185,37 +210,7 @@ func (m *MultiOSFileManager) UploadFile(ctx context.Context, userUUID, filename,
 		return "", err
 	}
 	logger.WithField("newFileUUID", fUUID)
-	// Save file to the local storage.
-	relPathOD := filepath.Join(userUUID, fUUID)
-	size, err := m.fileOps.SaveFile(relPathOD, contentReader)
-	if err != nil {
-		logger.Errorf("[-INTERNAL-] SaveFile failed with error %s", err.Error())
-		err = models.XtremeError{
-			Code:    models.InternalServerErrorCode,
-			Message: err.Error(),
-		}
-		return "", err
-	}
-	err = m.fileRepo.UpdateFileRelPathOD(ctx, tx, relPathOD, fUUID)
-	if err != nil {
-		logger.Errorf("[-INTERNAL-] UpdateFileRelPathOD failed with error %s", err.Error())
-		m.fileOps.RemoveFile(relPathOD)
-		err = models.XtremeError{
-			Code:    models.InternalServerErrorCode,
-			Message: err.Error(),
-		}
-		return "", err
-	}
-	err = m.fileRepo.UpdateFileSize(ctx, tx, size, fUUID)
-	if err != nil {
-		logger.Errorf("[-INTERNAL-] UpdateFileSize failed with error %s", err.Error())
-		m.fileOps.RemoveFile(relPathOD)
-		err = models.XtremeError{
-			Code:    models.InternalServerErrorCode,
-			Message: err.Error(),
-		}
-		return "", err
-	}
+
 	return fUUID, nil
 }
 
@@ -357,14 +352,40 @@ func (m *MultiOSFileManager) copyFile(ctx context.Context, tx transaction.Rollba
 	}
 	defer srcFReadCloser.Close()
 
+	saveFileFn := func(filepath string) (int64, error) {
+		// Save the dst file to the disk.
+		size, err := m.fileOps.SaveFile(filepath, srcFReadCloser)
+		if err != nil {
+			logger.Errorf("[-INTERNAL-] SaveFile failed with error %s", err.Error())
+			err = models.XtremeError{
+				Code:    models.InternalServerErrorCode,
+				Message: err.Error(),
+			}
+			return 0, err
+		}
+		return size, nil
+	}
+
+	// Get path of the parent dir UUID
+	parentDirMeta, err := m.dirRepo.GetDirMetadata(ctx, tx, dstParentDirUUID)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] GetDirMetadata failed with error %s", err.Error())
+		err = models.XtremeError{
+			Code:    models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
+		return "", err
+	}
+
 	newFile := models.File{
 		Metadata: models.FileMetadata{
 			Filename:   srcFile.Filename,
 			ParentUUID: dstParentDirUUID,
 			OwnerUUID:  userUUID, // other user can copy the owner's file (if permitted)
+			Path:       filepath.Join(parentDirMeta.Path, srcFile.Filename),
 		},
 	}
-	newFileUUID, err := m.fileRepo.InsertFile(ctx, tx, newFile)
+	newFileUUID, err := m.fileRepo.InsertFile(ctx, tx, newFile, saveFileFn)
 	if err != nil {
 		logger.Errorf("[-INTERNAL-] InsertFile failed with error %s", err.Error())
 		err = models.XtremeError{
@@ -373,38 +394,7 @@ func (m *MultiOSFileManager) copyFile(ctx context.Context, tx transaction.Rollba
 		}
 		return "", err
 	}
-	logger.WithField("newFileUUID", newFileUUID)
-	// Save the dst file to the disk.
-	relDstPathOD := filepath.Join(userUUID, fileUUID)
-	size, err := m.fileOps.SaveFile(relDstPathOD, srcFReadCloser)
-	if err != nil {
-		logger.Errorf("[-INTERNAL-] SaveFile failed with error %s", err.Error())
-		err = models.XtremeError{
-			Code:    models.InternalServerErrorCode,
-			Message: err.Error(),
-		}
-		return "", err
-	}
-	err = m.fileRepo.UpdateFileRelPathOD(ctx, tx, relDstPathOD, newFileUUID)
-	if err != nil {
-		logger.Errorf("[-INTERNAL-] UpdateFileRelPathOD failed with error %s", err.Error())
-		m.fileOps.RemoveFile(relDstPathOD)
-		err = models.XtremeError{
-			Code:    models.InternalServerErrorCode,
-			Message: err.Error(),
-		}
-		return "", err
-	}
-	err = m.fileRepo.UpdateFileSize(ctx, tx, size, newFileUUID)
-	if err != nil {
-		logger.Errorf("[-INTERNAL-] UpdateFileSize failed with error %s", err.Error())
-		m.fileOps.RemoveFile(relDstPathOD)
-		err = models.XtremeError{
-			Code:    models.InternalServerErrorCode,
-			Message: err.Error(),
-		}
-		return "", err
-	}
+
 	return newFileUUID, nil
 }
 
@@ -1036,7 +1026,7 @@ func (m *MultiOSFileManager) DownloadFileBatch(ctx context.Context, userUUID str
 	}
 	inZipPaths := make(map[string]string)
 	for _, srcFile := range srcFiles {
-		inZipPaths[srcFile.Filename] = srcFile.RelPathOnDisk
+		inZipPaths[srcFile.Path] = srcFile.RelPathOnDisk
 	}
 	tmpFilePath, err := m.fileCompress.CompressFiles(inZipPaths)
 	if err != nil {

@@ -26,7 +26,7 @@ func CreateNewFileZipper(basePath, tmpFilePath string) FileZipper {
 }
 
 func (z FileZipper) CompressFiles(inZipPaths map[string]string) (string, error) {
-	tmpFile, err := ioutil.TempFile("", "compress_temp_*")
+	tmpFile, err := ioutil.TempFile("", "compress_temp_*.zip")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -57,5 +57,5 @@ func (z FileZipper) CompressFiles(inZipPaths map[string]string) (string, error) 
 		// Close the real file.
 		fileToZip.Close()
 	}
-	return filepath.Rel(z.basePath, tmpFile.Name())
+	return tmpFile.Name(), nil
 }

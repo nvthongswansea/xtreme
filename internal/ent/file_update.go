@@ -56,6 +56,14 @@ func (fu *FileUpdate) SetPath(s string) *FileUpdate {
 	return fu
 }
 
+// SetNillablePath sets the "path" field if the given value is not nil.
+func (fu *FileUpdate) SetNillablePath(s *string) *FileUpdate {
+	if s != nil {
+		fu.SetPath(*s)
+	}
+	return fu
+}
+
 // SetRelPathOnDisk sets the "rel_path_on_disk" field.
 func (fu *FileUpdate) SetRelPathOnDisk(s string) *FileUpdate {
 	fu.mutation.SetRelPathOnDisk(s)
@@ -412,6 +420,14 @@ func (fuo *FileUpdateOne) SetNillableMimeType(s *string) *FileUpdateOne {
 // SetPath sets the "path" field.
 func (fuo *FileUpdateOne) SetPath(s string) *FileUpdateOne {
 	fuo.mutation.SetPath(s)
+	return fuo
+}
+
+// SetNillablePath sets the "path" field if the given value is not nil.
+func (fuo *FileUpdateOne) SetNillablePath(s *string) *FileUpdateOne {
+	if s != nil {
+		fuo.SetPath(*s)
+	}
 	return fuo
 }
 

@@ -42,6 +42,14 @@ func (du *DirectoryUpdate) SetPath(s string) *DirectoryUpdate {
 	return du
 }
 
+// SetNillablePath sets the "path" field if the given value is not nil.
+func (du *DirectoryUpdate) SetNillablePath(s *string) *DirectoryUpdate {
+	if s != nil {
+		du.SetPath(*s)
+	}
+	return du
+}
+
 // SetIsDeleted sets the "is_deleted" field.
 func (du *DirectoryUpdate) SetIsDeleted(b bool) *DirectoryUpdate {
 	du.mutation.SetIsDeleted(b)
@@ -512,6 +520,14 @@ func (duo *DirectoryUpdateOne) SetName(s string) *DirectoryUpdateOne {
 // SetPath sets the "path" field.
 func (duo *DirectoryUpdateOne) SetPath(s string) *DirectoryUpdateOne {
 	duo.mutation.SetPath(s)
+	return duo
+}
+
+// SetNillablePath sets the "path" field if the given value is not nil.
+func (duo *DirectoryUpdateOne) SetNillablePath(s *string) *DirectoryUpdateOne {
+	if s != nil {
+		duo.SetPath(*s)
+	}
 	return duo
 }
 

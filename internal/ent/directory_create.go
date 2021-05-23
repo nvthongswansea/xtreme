@@ -34,6 +34,14 @@ func (dc *DirectoryCreate) SetPath(s string) *DirectoryCreate {
 	return dc
 }
 
+// SetNillablePath sets the "path" field if the given value is not nil.
+func (dc *DirectoryCreate) SetNillablePath(s *string) *DirectoryCreate {
+	if s != nil {
+		dc.SetPath(*s)
+	}
+	return dc
+}
+
 // SetIsDeleted sets the "is_deleted" field.
 func (dc *DirectoryCreate) SetIsDeleted(b bool) *DirectoryCreate {
 	dc.mutation.SetIsDeleted(b)
@@ -194,6 +202,10 @@ func (dc *DirectoryCreate) SaveX(ctx context.Context) *Directory {
 
 // defaults sets the default values of the builder before save.
 func (dc *DirectoryCreate) defaults() {
+	if _, ok := dc.mutation.Path(); !ok {
+		v := directory.DefaultPath
+		dc.mutation.SetPath(v)
+	}
 	if _, ok := dc.mutation.IsDeleted(); !ok {
 		v := directory.DefaultIsDeleted
 		dc.mutation.SetIsDeleted(v)

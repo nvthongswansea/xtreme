@@ -14,10 +14,12 @@ type Repository interface {
 	Remover
 }
 
+type SaveFileToDiskFn func(filepath string) (size int64, err error)
+
 // Inserter holds inserting operations on files.
 type Inserter interface {
 	// InsertFile inserts a new file record to db.
-	InsertFile(ctx context.Context, tx transaction.RollbackCommitter, newFile models.File) (string, error)
+	InsertFile(ctx context.Context, tx transaction.RollbackCommitter, newFile models.File, saveFileFn SaveFileToDiskFn) (string, error)
 }
 
 // Reader holds reading operations on files.

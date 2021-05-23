@@ -111,11 +111,23 @@ func (m *MultiOSFileManager) createNewDirectory(ctx context.Context, tx transact
 		return "", err
 	}
 
+	// Get path of the parent dir UUID
+	parentDirMeta, err := m.dirRepo.GetDirMetadata(ctx, tx, parentDirUUID)
+	if err != nil {
+		logger.Errorf("[-INTERNAL-] GetDirMetadata failed with error %s", err.Error())
+		err = models.XtremeError{
+			Code:    models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
+		return "", err
+	}
+
 	newDirUUID, err := m.dirRepo.InsertDirectory(ctx, tx, models.Directory{
 		Metadata: models.DirectoryMetadata{
 			Dirname:    dirname,
 			ParentUUID: parentDirUUID,
 			OwnerUUID:  userUUID,
+			Path:       filepath.Join(parentDirMeta.Path, dirname),
 		},
 	})
 	if err != nil {

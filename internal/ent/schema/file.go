@@ -19,7 +19,7 @@ func (File) Fields() []ent.Field {
 		field.String("id").NotEmpty().Unique().Immutable(),
 		field.String("name").NotEmpty(),
 		field.String("mime_type").Default("unknown"),
-		field.String("path"),
+		field.String("path").Default(""),
 		field.String("rel_path_on_disk").NotEmpty().Unique(),
 		field.Int64("size").NonNegative(),
 		field.Bool("is_deleted").Default(false),

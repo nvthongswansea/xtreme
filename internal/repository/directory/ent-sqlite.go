@@ -31,7 +31,6 @@ func (e EntSQLDirectoryRepo) InsertRootDirectory(ctx context.Context, tx transac
 		Create().
 		SetID(e.uuidTool.NewUUID()).
 		SetName("root").
-		SetPath("/").
 		SetOwnerID(userUUID).
 		Save(ctx)
 	if err != nil {
@@ -51,6 +50,7 @@ func (e EntSQLDirectoryRepo) InsertDirectory(ctx context.Context, tx transaction
 		SetName(newDir.Metadata.Dirname).
 		SetOwnerID(newDir.Metadata.OwnerUUID).
 		SetParentID(newDir.Metadata.ParentUUID).
+		SetPath(newDir.Metadata.Path).
 		Save(ctx)
 	if err != nil {
 		return "", err
@@ -100,21 +100,26 @@ func (e EntSQLDirectoryRepo) GetDirectory(ctx context.Context, tx transaction.Ro
 			})
 		}
 	}
-	return models.Directory{
+	resDir := models.Directory{
 		Metadata: models.DirectoryMetadata{
 			UUID:       dir.ID,
 			Dirname:    dir.Name,
 			Path:       dir.Path,
-			ParentUUID: dir.Edges.Parent.ID,
 			OwnerUUID:  dir.Edges.Owner.ID,
 			CreatedAt:  dir.CreatedAt,
 			UpdatedAt:  dir.UpdatedAt,
 		},
+
+
 		Content: models.DirectoryContent{
 			ListOfFiles: fileMetadataList,
 			ListOfDirs:  dirMetadataList,
 		},
-	}, nil
+	}
+	if 	dir.Edges.Parent != nil {
+		resDir.Metadata.ParentUUID = dir.Edges.Parent.ID
+	}
+	return resDir, nil
 }
 
 func (e EntSQLDirectoryRepo) GetDirMetadata(ctx context.Context, tx transaction.RollbackCommitter, dirUUID string) (models.DirectoryMetadata, error) {

@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-const filenameInvalidChars string = "\\/.?%*:|\"<>,;= "
+const filenameInvalidChars string = "\\/?%*:|\"<>,;= "
 
 //const maxCopyFileResultChanSize = 100
 

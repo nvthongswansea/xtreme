@@ -89,6 +89,8 @@ var (
 	NameValidator func(string) error
 	// DefaultMimeType holds the default value on creation for the "mime_type" field.
 	DefaultMimeType string
+	// DefaultPath holds the default value on creation for the "path" field.
+	DefaultPath string
 	// RelPathOnDiskValidator is a validator for the "rel_path_on_disk" field. It is called by the builders before save.
 	RelPathOnDiskValidator func(string) error
 	// SizeValidator is a validator for the "size" field. It is called by the builders before save.
