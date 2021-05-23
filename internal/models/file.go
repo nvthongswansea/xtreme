@@ -1,7 +1,7 @@
 package models
 
 import (
-	fileUtils "github.com/nvthongswansea/xtreme/pkg/file-utils"
+	fileUtils "github.com/nvthongswansea/xtreme/pkg/fileUtils"
 	"time"
 )
 

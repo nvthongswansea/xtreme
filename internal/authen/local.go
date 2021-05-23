@@ -2,10 +2,14 @@ package authen
 
 import (
 	"context"
+	"fmt"
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/nvthongswansea/xtreme/internal/models"
+	"github.com/nvthongswansea/xtreme/internal/repository/directory"
+	"github.com/nvthongswansea/xtreme/internal/repository/transaction"
 	"github.com/nvthongswansea/xtreme/internal/repository/user"
 	"github.com/nvthongswansea/xtreme/pkg/pwd"
+	"time"
 )
 
 const (
@@ -17,12 +21,25 @@ const (
 
 type LocalJWTAuthenticator struct {
 	userRepo  user.Repository
+	txRepo    transaction.TxRepository
+	rootDir   directory.Inserter
 	pwdUtils  pwd.BCryptHashComparer
 	jwtSecret string
 }
 
 func (l *LocalJWTAuthenticator) Register(ctx context.Context, username, password string) error {
-	isUsernameExist, err := l.userRepo.IsUsernameExist(ctx, username)
+	var err error
+	tx, err := l.txRepo.StartTransaction(ctx)
+	if err != nil {
+		return models.XtremeError{
+			Code:    models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
+	}
+	defer func(err error) {
+		l.txRepo.FinishTransaction(tx, err)
+	}(err)
+	isUsernameExist, err := l.userRepo.IsUsernameExist(ctx, tx, username)
 	if err != nil {
 		return models.XtremeError{
 			Code:    models.InternalServerErrorCode,
@@ -43,7 +60,16 @@ func (l *LocalJWTAuthenticator) Register(ctx context.Context, username, password
 		}
 	}
 
-	err = l.userRepo.InsertNewUser(ctx, username, hashPwd)
+	userUUID, err := l.userRepo.InsertNewUser(ctx, tx, hashPwd, username)
+	if err != nil {
+		return models.XtremeError{
+			Code:    models.InternalServerErrorCode,
+			Message: err.Error(),
+		}
+	}
+
+	// Create new user's root directory
+	err = l.rootDir.InsertRootDirectory(ctx, tx, userUUID)
 	if err != nil {
 		return models.XtremeError{
 			Code:    models.InternalServerErrorCode,
@@ -54,7 +80,7 @@ func (l *LocalJWTAuthenticator) Register(ctx context.Context, username, password
 }
 
 func (l *LocalJWTAuthenticator) Login(ctx context.Context, username, password string) (string, error) {
-	isUsernameExist, err := l.userRepo.IsUsernameExist(ctx, username)
+	isUsernameExist, err := l.userRepo.IsUsernameExist(ctx, nil, username)
 	if err != nil {
 		return "", models.XtremeError{
 			Code:    models.InternalServerErrorCode,
@@ -67,7 +93,7 @@ func (l *LocalJWTAuthenticator) Login(ctx context.Context, username, password st
 			Message: incorrectUsernamePwdErrorMessage,
 		}
 	}
-	user, err := l.userRepo.GetUserByUsername(ctx, username)
+	user, err := l.userRepo.GetUserByUsername(ctx, nil, username)
 	if err != nil {
 		return "", models.XtremeError{
 			Code:    models.InternalServerErrorCode,
@@ -75,18 +101,16 @@ func (l *LocalJWTAuthenticator) Login(ctx context.Context, username, password st
 		}
 	}
 	if !l.pwdUtils.CompareHashAndPwd(password, user.HashPwd) {
-		if !isUsernameExist {
-			return "", models.XtremeError{
-				Code:    models.BadInputErrorCode,
-				Message: incorrectUsernamePwdErrorMessage,
-			}
+		return "", models.XtremeError{
+			Code:    models.BadInputErrorCode,
+			Message: incorrectUsernamePwdErrorMessage,
 		}
 	}
 	claims := XtremeTokenClaims{
 		UserUUID: user.UUID,
 		Username: user.Username,
 		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: 15000,
+			ExpiresAt: time.Now().Add(time.Hour * 72).Unix(),
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -97,27 +121,36 @@ func (l *LocalJWTAuthenticator) Login(ctx context.Context, username, password st
 			Message: err.Error(),
 		}
 	}
+	fmt.Println(token.Claims)
 	return ss, nil
 }
 
 func (l *LocalJWTAuthenticator) GetDataViaToken(ctx context.Context, token interface{}) (XtremeTokenClaims, error) {
 	jwtToken, ok := token.(*jwt.Token)
 	if !ok {
+		fmt.Println("not ok")
 		return XtremeTokenClaims{}, models.XtremeError{
 			Code:    models.InternalServerErrorCode,
 			Message: jwtAssertionErrorMessage,
 		}
 	}
-	claims, ok := jwtToken.Claims.(XtremeTokenClaims)
+	claims, ok := jwtToken.Claims.(*XtremeTokenClaims)
 	if !ok {
+		fmt.Println("not ok 2")
 		return XtremeTokenClaims{}, models.XtremeError{
 			Code:    models.InternalServerErrorCode,
 			Message: jwtClaimsAssertionErrorMessage,
 		}
 	}
-	return claims, nil
+	return *claims, nil
 }
 
-func NewLocalAuthenticator(userRepo user.Repository, pwdUtils pwd.BCryptHashComparer, jwtSecret string) *LocalJWTAuthenticator {
-	return &LocalJWTAuthenticator{userRepo: userRepo, pwdUtils: pwdUtils, jwtSecret: jwtSecret}
+func NewLocalAuthenticator(userRepo user.Repository, txRepo transaction.TxRepository, rootDir directory.Inserter, pwdUtils pwd.BCryptHashComparer, jwtSecret string) *LocalJWTAuthenticator {
+	return &LocalJWTAuthenticator{
+		userRepo:  userRepo,
+		rootDir:   rootDir,
+		txRepo:    txRepo,
+		pwdUtils:  pwdUtils,
+		jwtSecret: jwtSecret,
+	}
 }

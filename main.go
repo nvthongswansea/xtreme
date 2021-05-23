@@ -1,17 +1,16 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
-	"os"
-
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	restful "github.com/nvthongswansea/xtreme/internal/fman/delivery/restful"
-	_fmanRepo "github.com/nvthongswansea/xtreme/internal/fman/repo"
-	_fmanUC "github.com/nvthongswansea/xtreme/internal/fman/usecase"
-	fileUtils "github.com/nvthongswansea/xtreme/pkg/file-utils"
-	uuidUtils "github.com/nvthongswansea/xtreme/pkg/uuid-utils"
+	"github.com/nvthongswansea/xtreme/internal/ent"
+	"github.com/nvthongswansea/xtreme/internal/http"
+	"os"
+
+	_ "github.com/mattn/go-sqlite3"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -55,15 +54,20 @@ func init() {
 }
 
 func main() {
-	sqliteRepo := _fmanRepo.NewFManSQLiteRepo()
-	uuidGenerator := &uuidUtils.GoogleUUIDGenerator{}
-	localFileOps := fileUtils.CreateNewLocalFileOperator(xtremeCfg.Backend.UploadDir)
-	fmanUC := _fmanUC.NewFManLocalUsecase(sqliteRepo, sqliteRepo, sqliteRepo, uuidGenerator, localFileOps)
-	//Start web service
+	client, err := ent.Open("sqlite3", "app.db:ent?mode=memory&cache=shared&_fk=1")
+	if err != nil {
+		log.Fatalf("failed opening connection to sqlite: %v", err)
+	}
+	defer client.Close()
+	// Run the auto migration tool.
+	if err := client.Schema.Create(context.Background()); err != nil {
+		log.Fatalf("failed creating schema resources: %v", err)
+	}
 	e := echo.New()
-	restful.InitFmanHandler(e, fmanUC)
+	http.InitHTTPHandler(e, client, xtremeCfg.Backend.UploadDir)
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
+	//e.Logger = &log.Logger{}
 	backendAddr := fmt.Sprintf("%s:%d", xtremeCfg.Backend.Host, xtremeCfg.Backend.Port)
 	e.Logger.Fatal(e.Start(backendAddr))
 }

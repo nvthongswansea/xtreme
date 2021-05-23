@@ -1,6 +1,9 @@
 package author
 
-import "context"
+import (
+	"context"
+	"github.com/nvthongswansea/xtreme/internal/repository/transaction"
+)
 
 type fileAction string
 
@@ -29,7 +32,7 @@ type Authorizer interface {
 	// Output: If authorization succeeds, return true/false, nil error;
 	// otherwise, return false and an error.
 	// Error is an internal server error.
-	AuthorizeActionsOnFile(ctx context.Context, userUUID, fileUUID string, actions ...fileAction) (bool, error)
+	AuthorizeActionsOnFile(ctx context.Context, tx transaction.RollbackCommitter, userUUID, fileUUID string, actions ...fileAction) (bool, error)
 
 	// AuthorizeActionsOnDir checks if a "user" has permission to
 	// do series of "actions" to a specific directory.
@@ -39,5 +42,5 @@ type Authorizer interface {
 	// Error is an internal server error.
 	//
 	// **Note**: Be careful about the "root" directory of a user.
-	AuthorizeActionsOnDir(ctx context.Context, userUUID, dirUUID string, actions ...dirAction) (bool, error)
+	AuthorizeActionsOnDir(ctx context.Context, tx transaction.RollbackCommitter, userUUID, dirUUID string, actions ...dirAction) (bool, error)
 }

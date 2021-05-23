@@ -12,3 +12,13 @@ type CopyMvRequest struct {
 type RenameRequest struct {
 	NewName string `json:"new_name"`
 }
+
+type CreateUserRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type AuthenUserRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}

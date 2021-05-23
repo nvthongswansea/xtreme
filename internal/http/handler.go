@@ -1,47 +1,32 @@
 package http
 
-//import (
-//	"net/http"
-//
-//	"github.com/labstack/echo/v4"
-//	"github.com/nvthongswansea/xtreme/internal/fman"
-//)
-//
-//// ResponseError represents http response error in JSON format
-//type Response struct {
-//	Message string `json:"message"`
-//}
-//
-//// FmanHandler represents the http handler for file manage
-//type FmanHandler struct {
-//	FmanUsecase fman.FmanUsecase
-//}
-//
-//// InitFmanHandler initialize file manager endpoints
-//func InitFmanHandler(e *echo.Echo, uc fman.FmanUsecase) {
-//	handler := &FmanHandler{FmanUsecase: uc}
-//	g := e.Group("/fman")
-//	g.POST("/file", handler.UploadFile)
-//}
-//
-//func (h *FmanHandler) UploadFile(c echo.Context) error {
-//	// Get file from form
-//	file, err := c.FormFile("file")
-//	if err != nil {
-//		return err
-//	}
-//	src, err := file.Open()
-//	if err != nil {
-//		return err
-//	}
-//	defer src.Close()
-//
-//	filename := c.FormValue("filename")
-//	parentUUID := c.FormValue("parent_uuid")
-//	// Save file
-//	err = h.FmanUsecase.UploadFile(filename, parentUUID, src)
-//	if err != nil {
-//		return err
-//	}
-//	return c.JSON(http.StatusOK, Response{Message: "Uploaded file successfully"})
-//}
+import (
+	"github.com/labstack/echo/v4"
+	"github.com/nvthongswansea/xtreme/internal/authen"
+	"github.com/nvthongswansea/xtreme/internal/author"
+	"github.com/nvthongswansea/xtreme/internal/ent"
+	"github.com/nvthongswansea/xtreme/internal/file-manager/local"
+	"github.com/nvthongswansea/xtreme/internal/repository/directory"
+	"github.com/nvthongswansea/xtreme/internal/repository/file"
+	"github.com/nvthongswansea/xtreme/internal/repository/user"
+	"github.com/nvthongswansea/xtreme/pkg/fileUtils"
+	"github.com/nvthongswansea/xtreme/pkg/pwd"
+	uuidUtils "github.com/nvthongswansea/xtreme/pkg/uuidUtils"
+)
+
+// InitHTTPHandler
+func InitHTTPHandler(e *echo.Echo, client *ent.Client, basePath string) {
+	uuidUtils := uuidUtils.GoogleUUIDGenerator{}
+	passwordUtils := pwd.NewBCryptHashComparer(10)
+	userRepo := user.NewEntSQLUserRepo(client, uuidUtils)
+
+	authService := authen.NewLocalAuthenticator(userRepo, passwordUtils, "test")
+	attachAuthenHTTPHandlerHandler(e, authService)
+
+	fileRepo := file.NewEntSQLFileRepo(client, uuidUtils)
+	dirRepo := directory.NewEntSQLDirectoryRepo(client, uuidUtils)
+	fileOps := fileUtils.CreateNewLocalFileOperator(basePath)
+	fileCompress := fileUtils.CreateNewFileZipper(basePath, "")
+	localFManService := local.NewMultiOSFileManager(fileRepo, dirRepo, uuidUtils, fileOps, fileCompress, author.StubAuthorizer{})
+	attachLocalFManHTTPHandler(e, localFManService, authService)
+}

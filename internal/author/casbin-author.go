@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/casbin/casbin/v2"
 	"github.com/nvthongswansea/xtreme/internal/repository/role"
+	"github.com/nvthongswansea/xtreme/internal/repository/transaction"
 )
 
 // CasbinAuthorizer is a casbin implementation of
@@ -21,9 +22,9 @@ func NewCasbinAuthorizer(modelPath, policyPath string, roleRepo role.Repository)
 }
 
 // AuthorizeActionsOnFile checks if a user has a right to perform some actions on a certain file.
-func (c *CasbinAuthorizer) AuthorizeActionsOnFile(ctx context.Context, userUUID, fileUUID string, actions ...fileAction) (bool, error) {
+func (c *CasbinAuthorizer) AuthorizeActionsOnFile(ctx context.Context, tx transaction.RollbackCommitter, userUUID, fileUUID string, actions ...fileAction) (bool, error) {
 	// Get user role.
-	role, err := c.roleRepo.GetUserRoleByFile(ctx, userUUID, fileUUID)
+	role, err := c.roleRepo.GetUserRoleByFile(ctx, tx, fileUUID, userUUID)
 	if err != nil {
 		return false, err
 	}
@@ -40,9 +41,9 @@ func (c *CasbinAuthorizer) AuthorizeActionsOnFile(ctx context.Context, userUUID,
 }
 
 // AuthorizeActionsOnDir checks if a user has a right to perform some actions on a certain directory.
-func (c *CasbinAuthorizer) AuthorizeActionsOnDir(ctx context.Context, userUUID, dirUUID string, actions ...dirAction) (bool, error) {
+func (c *CasbinAuthorizer) AuthorizeActionsOnDir(ctx context.Context, tx transaction.RollbackCommitter, userUUID, dirUUID string, actions ...dirAction) (bool, error) {
 	// Get user role.
-	role, err := c.roleRepo.GetUserRoleByDirectory(ctx, userUUID, dirUUID)
+	role, err := c.roleRepo.GetUserRoleByDirectory(ctx, tx, dirUUID, userUUID)
 	if err != nil {
 		return false, err
 	}
