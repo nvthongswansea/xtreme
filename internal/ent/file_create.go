@@ -55,8 +55,22 @@ func (fc *FileCreate) SetRelPathOnDisk(s string) *FileCreate {
 }
 
 // SetSize sets the "size" field.
-func (fc *FileCreate) SetSize(i int) *FileCreate {
+func (fc *FileCreate) SetSize(i int64) *FileCreate {
 	fc.mutation.SetSize(i)
+	return fc
+}
+
+// SetIsDeleted sets the "is_deleted" field.
+func (fc *FileCreate) SetIsDeleted(b bool) *FileCreate {
+	fc.mutation.SetIsDeleted(b)
+	return fc
+}
+
+// SetNillableIsDeleted sets the "is_deleted" field if the given value is not nil.
+func (fc *FileCreate) SetNillableIsDeleted(b *bool) *FileCreate {
+	if b != nil {
+		fc.SetIsDeleted(*b)
+	}
 	return fc
 }
 
@@ -172,6 +186,10 @@ func (fc *FileCreate) defaults() {
 		v := file.DefaultMimeType
 		fc.mutation.SetMimeType(v)
 	}
+	if _, ok := fc.mutation.IsDeleted(); !ok {
+		v := file.DefaultIsDeleted
+		fc.mutation.SetIsDeleted(v)
+	}
 	if _, ok := fc.mutation.CreatedAt(); !ok {
 		v := file.DefaultCreatedAt()
 		fc.mutation.SetCreatedAt(v)
@@ -213,6 +231,9 @@ func (fc *FileCreate) check() error {
 		if err := file.SizeValidator(v); err != nil {
 			return &ValidationError{Name: "size", err: fmt.Errorf("ent: validator failed for field \"size\": %w", err)}
 		}
+	}
+	if _, ok := fc.mutation.IsDeleted(); !ok {
+		return &ValidationError{Name: "is_deleted", err: errors.New("ent: missing required field \"is_deleted\"")}
 	}
 	if _, ok := fc.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New("ent: missing required field \"created_at\"")}
@@ -294,11 +315,19 @@ func (fc *FileCreate) createSpec() (*File, *sqlgraph.CreateSpec) {
 	}
 	if value, ok := fc.mutation.Size(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
-			Type:   field.TypeInt,
+			Type:   field.TypeInt64,
 			Value:  value,
 			Column: file.FieldSize,
 		})
 		_node.Size = value
+	}
+	if value, ok := fc.mutation.IsDeleted(); ok {
+		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
+			Type:   field.TypeBool,
+			Value:  value,
+			Column: file.FieldIsDeleted,
+		})
+		_node.IsDeleted = value
 	}
 	if value, ok := fc.mutation.CreatedAt(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{

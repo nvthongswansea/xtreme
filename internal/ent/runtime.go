@@ -21,12 +21,16 @@ func init() {
 	directoryDescName := directoryFields[1].Descriptor()
 	// directory.NameValidator is a validator for the "name" field. It is called by the builders before save.
 	directory.NameValidator = directoryDescName.Validators[0].(func(string) error)
+	// directoryDescIsDeleted is the schema descriptor for is_deleted field.
+	directoryDescIsDeleted := directoryFields[3].Descriptor()
+	// directory.DefaultIsDeleted holds the default value on creation for the is_deleted field.
+	directory.DefaultIsDeleted = directoryDescIsDeleted.Default.(bool)
 	// directoryDescCreatedAt is the schema descriptor for created_at field.
-	directoryDescCreatedAt := directoryFields[3].Descriptor()
+	directoryDescCreatedAt := directoryFields[4].Descriptor()
 	// directory.DefaultCreatedAt holds the default value on creation for the created_at field.
 	directory.DefaultCreatedAt = directoryDescCreatedAt.Default.(func() time.Time)
 	// directoryDescUpdatedAt is the schema descriptor for updated_at field.
-	directoryDescUpdatedAt := directoryFields[4].Descriptor()
+	directoryDescUpdatedAt := directoryFields[5].Descriptor()
 	// directory.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	directory.DefaultUpdatedAt = directoryDescUpdatedAt.Default.(func() time.Time)
 	// directory.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -52,13 +56,17 @@ func init() {
 	// fileDescSize is the schema descriptor for size field.
 	fileDescSize := fileFields[5].Descriptor()
 	// file.SizeValidator is a validator for the "size" field. It is called by the builders before save.
-	file.SizeValidator = fileDescSize.Validators[0].(func(int) error)
+	file.SizeValidator = fileDescSize.Validators[0].(func(int64) error)
+	// fileDescIsDeleted is the schema descriptor for is_deleted field.
+	fileDescIsDeleted := fileFields[6].Descriptor()
+	// file.DefaultIsDeleted holds the default value on creation for the is_deleted field.
+	file.DefaultIsDeleted = fileDescIsDeleted.Default.(bool)
 	// fileDescCreatedAt is the schema descriptor for created_at field.
-	fileDescCreatedAt := fileFields[6].Descriptor()
+	fileDescCreatedAt := fileFields[7].Descriptor()
 	// file.DefaultCreatedAt holds the default value on creation for the created_at field.
 	file.DefaultCreatedAt = fileDescCreatedAt.Default.(func() time.Time)
 	// fileDescUpdatedAt is the schema descriptor for updated_at field.
-	fileDescUpdatedAt := fileFields[7].Descriptor()
+	fileDescUpdatedAt := fileFields[8].Descriptor()
 	// file.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	file.DefaultUpdatedAt = fileDescUpdatedAt.Default.(func() time.Time)
 	// file.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

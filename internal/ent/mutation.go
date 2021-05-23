@@ -38,6 +38,7 @@ type DirectoryMutation struct {
 	id                *string
 	name              *string
 	_path             *string
+	is_deleted        *bool
 	created_at        *time.Time
 	updated_at        *time.Time
 	clearedFields     map[string]struct{}
@@ -211,6 +212,42 @@ func (m *DirectoryMutation) OldPath(ctx context.Context) (v string, err error) {
 // ResetPath resets all changes to the "path" field.
 func (m *DirectoryMutation) ResetPath() {
 	m._path = nil
+}
+
+// SetIsDeleted sets the "is_deleted" field.
+func (m *DirectoryMutation) SetIsDeleted(b bool) {
+	m.is_deleted = &b
+}
+
+// IsDeleted returns the value of the "is_deleted" field in the mutation.
+func (m *DirectoryMutation) IsDeleted() (r bool, exists bool) {
+	v := m.is_deleted
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIsDeleted returns the old "is_deleted" field's value of the Directory entity.
+// If the Directory object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DirectoryMutation) OldIsDeleted(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, fmt.Errorf("OldIsDeleted is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, fmt.Errorf("OldIsDeleted requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIsDeleted: %w", err)
+	}
+	return oldValue.IsDeleted, nil
+}
+
+// ResetIsDeleted resets all changes to the "is_deleted" field.
+func (m *DirectoryMutation) ResetIsDeleted() {
+	m.is_deleted = nil
 }
 
 // SetCreatedAt sets the "created_at" field.
@@ -483,12 +520,15 @@ func (m *DirectoryMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *DirectoryMutation) Fields() []string {
-	fields := make([]string, 0, 4)
+	fields := make([]string, 0, 5)
 	if m.name != nil {
 		fields = append(fields, directory.FieldName)
 	}
 	if m._path != nil {
 		fields = append(fields, directory.FieldPath)
+	}
+	if m.is_deleted != nil {
+		fields = append(fields, directory.FieldIsDeleted)
 	}
 	if m.created_at != nil {
 		fields = append(fields, directory.FieldCreatedAt)
@@ -508,6 +548,8 @@ func (m *DirectoryMutation) Field(name string) (ent.Value, bool) {
 		return m.Name()
 	case directory.FieldPath:
 		return m.Path()
+	case directory.FieldIsDeleted:
+		return m.IsDeleted()
 	case directory.FieldCreatedAt:
 		return m.CreatedAt()
 	case directory.FieldUpdatedAt:
@@ -525,6 +567,8 @@ func (m *DirectoryMutation) OldField(ctx context.Context, name string) (ent.Valu
 		return m.OldName(ctx)
 	case directory.FieldPath:
 		return m.OldPath(ctx)
+	case directory.FieldIsDeleted:
+		return m.OldIsDeleted(ctx)
 	case directory.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case directory.FieldUpdatedAt:
@@ -551,6 +595,13 @@ func (m *DirectoryMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetPath(v)
+		return nil
+	case directory.FieldIsDeleted:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIsDeleted(v)
 		return nil
 	case directory.FieldCreatedAt:
 		v, ok := value.(time.Time)
@@ -620,6 +671,9 @@ func (m *DirectoryMutation) ResetField(name string) error {
 		return nil
 	case directory.FieldPath:
 		m.ResetPath()
+		return nil
+	case directory.FieldIsDeleted:
+		m.ResetIsDeleted()
 		return nil
 	case directory.FieldCreatedAt:
 		m.ResetCreatedAt()
@@ -787,8 +841,9 @@ type FileMutation struct {
 	mime_type        *string
 	_path            *string
 	rel_path_on_disk *string
-	size             *int
-	addsize          *int
+	size             *int64
+	addsize          *int64
+	is_deleted       *bool
 	created_at       *time.Time
 	updated_at       *time.Time
 	clearedFields    map[string]struct{}
@@ -1031,13 +1086,13 @@ func (m *FileMutation) ResetRelPathOnDisk() {
 }
 
 // SetSize sets the "size" field.
-func (m *FileMutation) SetSize(i int) {
+func (m *FileMutation) SetSize(i int64) {
 	m.size = &i
 	m.addsize = nil
 }
 
 // Size returns the value of the "size" field in the mutation.
-func (m *FileMutation) Size() (r int, exists bool) {
+func (m *FileMutation) Size() (r int64, exists bool) {
 	v := m.size
 	if v == nil {
 		return
@@ -1048,7 +1103,7 @@ func (m *FileMutation) Size() (r int, exists bool) {
 // OldSize returns the old "size" field's value of the File entity.
 // If the File object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *FileMutation) OldSize(ctx context.Context) (v int, err error) {
+func (m *FileMutation) OldSize(ctx context.Context) (v int64, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, fmt.Errorf("OldSize is only allowed on UpdateOne operations")
 	}
@@ -1063,7 +1118,7 @@ func (m *FileMutation) OldSize(ctx context.Context) (v int, err error) {
 }
 
 // AddSize adds i to the "size" field.
-func (m *FileMutation) AddSize(i int) {
+func (m *FileMutation) AddSize(i int64) {
 	if m.addsize != nil {
 		*m.addsize += i
 	} else {
@@ -1072,7 +1127,7 @@ func (m *FileMutation) AddSize(i int) {
 }
 
 // AddedSize returns the value that was added to the "size" field in this mutation.
-func (m *FileMutation) AddedSize() (r int, exists bool) {
+func (m *FileMutation) AddedSize() (r int64, exists bool) {
 	v := m.addsize
 	if v == nil {
 		return
@@ -1084,6 +1139,42 @@ func (m *FileMutation) AddedSize() (r int, exists bool) {
 func (m *FileMutation) ResetSize() {
 	m.size = nil
 	m.addsize = nil
+}
+
+// SetIsDeleted sets the "is_deleted" field.
+func (m *FileMutation) SetIsDeleted(b bool) {
+	m.is_deleted = &b
+}
+
+// IsDeleted returns the value of the "is_deleted" field in the mutation.
+func (m *FileMutation) IsDeleted() (r bool, exists bool) {
+	v := m.is_deleted
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIsDeleted returns the old "is_deleted" field's value of the File entity.
+// If the File object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FileMutation) OldIsDeleted(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, fmt.Errorf("OldIsDeleted is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, fmt.Errorf("OldIsDeleted requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIsDeleted: %w", err)
+	}
+	return oldValue.IsDeleted, nil
+}
+
+// ResetIsDeleted resets all changes to the "is_deleted" field.
+func (m *FileMutation) ResetIsDeleted() {
+	m.is_deleted = nil
 }
 
 // SetCreatedAt sets the "created_at" field.
@@ -1250,7 +1341,7 @@ func (m *FileMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *FileMutation) Fields() []string {
-	fields := make([]string, 0, 7)
+	fields := make([]string, 0, 8)
 	if m.name != nil {
 		fields = append(fields, file.FieldName)
 	}
@@ -1265,6 +1356,9 @@ func (m *FileMutation) Fields() []string {
 	}
 	if m.size != nil {
 		fields = append(fields, file.FieldSize)
+	}
+	if m.is_deleted != nil {
+		fields = append(fields, file.FieldIsDeleted)
 	}
 	if m.created_at != nil {
 		fields = append(fields, file.FieldCreatedAt)
@@ -1290,6 +1384,8 @@ func (m *FileMutation) Field(name string) (ent.Value, bool) {
 		return m.RelPathOnDisk()
 	case file.FieldSize:
 		return m.Size()
+	case file.FieldIsDeleted:
+		return m.IsDeleted()
 	case file.FieldCreatedAt:
 		return m.CreatedAt()
 	case file.FieldUpdatedAt:
@@ -1313,6 +1409,8 @@ func (m *FileMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldRelPathOnDisk(ctx)
 	case file.FieldSize:
 		return m.OldSize(ctx)
+	case file.FieldIsDeleted:
+		return m.OldIsDeleted(ctx)
 	case file.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case file.FieldUpdatedAt:
@@ -1355,11 +1453,18 @@ func (m *FileMutation) SetField(name string, value ent.Value) error {
 		m.SetRelPathOnDisk(v)
 		return nil
 	case file.FieldSize:
-		v, ok := value.(int)
+		v, ok := value.(int64)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetSize(v)
+		return nil
+	case file.FieldIsDeleted:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIsDeleted(v)
 		return nil
 	case file.FieldCreatedAt:
 		v, ok := value.(time.Time)
@@ -1406,7 +1511,7 @@ func (m *FileMutation) AddedField(name string) (ent.Value, bool) {
 func (m *FileMutation) AddField(name string, value ent.Value) error {
 	switch name {
 	case file.FieldSize:
-		v, ok := value.(int)
+		v, ok := value.(int64)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -1453,6 +1558,9 @@ func (m *FileMutation) ResetField(name string) error {
 		return nil
 	case file.FieldSize:
 		m.ResetSize()
+		return nil
+	case file.FieldIsDeleted:
+		m.ResetIsDeleted()
 		return nil
 	case file.FieldCreatedAt:
 		m.ResetCreatedAt()

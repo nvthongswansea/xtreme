@@ -10,6 +10,12 @@ type EntSQLTxRepo struct {
 	client *ent.Client
 }
 
+func NewEntSQLTxRepo(client *ent.Client) EntSQLTxRepo {
+	return EntSQLTxRepo{
+		client: client,
+	}
+}
+
 func (e EntSQLTxRepo) StartTransaction(ctx context.Context) (RollbackCommitter, error) {
 	return e.client.Tx(ctx)
 }

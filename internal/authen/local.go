@@ -69,7 +69,7 @@ func (l *LocalJWTAuthenticator) Register(ctx context.Context, username, password
 	}
 
 	// Create new user's root directory
-	err = l.rootDir.InsertRootDirectory(ctx, tx, userUUID)
+	_, err = l.rootDir.InsertRootDirectory(ctx, tx, userUUID)
 	if err != nil {
 		return models.XtremeError{
 			Code:    models.InternalServerErrorCode,

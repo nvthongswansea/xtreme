@@ -107,6 +107,13 @@ func Path(v string) predicate.Directory {
 	})
 }
 
+// IsDeleted applies equality check predicate on the "is_deleted" field. It's identical to IsDeletedEQ.
+func IsDeleted(v bool) predicate.Directory {
+	return predicate.Directory(func(s *sql.Selector) {
+		s.Where(sql.EQ(s.C(FieldIsDeleted), v))
+	})
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.Directory {
 	return predicate.Directory(func(s *sql.Selector) {
@@ -340,6 +347,20 @@ func PathEqualFold(v string) predicate.Directory {
 func PathContainsFold(v string) predicate.Directory {
 	return predicate.Directory(func(s *sql.Selector) {
 		s.Where(sql.ContainsFold(s.C(FieldPath), v))
+	})
+}
+
+// IsDeletedEQ applies the EQ predicate on the "is_deleted" field.
+func IsDeletedEQ(v bool) predicate.Directory {
+	return predicate.Directory(func(s *sql.Selector) {
+		s.Where(sql.EQ(s.C(FieldIsDeleted), v))
+	})
+}
+
+// IsDeletedNEQ applies the NEQ predicate on the "is_deleted" field.
+func IsDeletedNEQ(v bool) predicate.Directory {
+	return predicate.Directory(func(s *sql.Selector) {
+		s.Where(sql.NEQ(s.C(FieldIsDeleted), v))
 	})
 }
 

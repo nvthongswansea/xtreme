@@ -42,6 +42,20 @@ func (du *DirectoryUpdate) SetPath(s string) *DirectoryUpdate {
 	return du
 }
 
+// SetIsDeleted sets the "is_deleted" field.
+func (du *DirectoryUpdate) SetIsDeleted(b bool) *DirectoryUpdate {
+	du.mutation.SetIsDeleted(b)
+	return du
+}
+
+// SetNillableIsDeleted sets the "is_deleted" field if the given value is not nil.
+func (du *DirectoryUpdate) SetNillableIsDeleted(b *bool) *DirectoryUpdate {
+	if b != nil {
+		du.SetIsDeleted(*b)
+	}
+	return du
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (du *DirectoryUpdate) SetUpdatedAt(t time.Time) *DirectoryUpdate {
 	du.mutation.SetUpdatedAt(t)
@@ -278,6 +292,13 @@ func (du *DirectoryUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			Column: directory.FieldPath,
 		})
 	}
+	if value, ok := du.mutation.IsDeleted(); ok {
+		_spec.Fields.Set = append(_spec.Fields.Set, &sqlgraph.FieldSpec{
+			Type:   field.TypeBool,
+			Value:  value,
+			Column: directory.FieldIsDeleted,
+		})
+	}
 	if value, ok := du.mutation.UpdatedAt(); ok {
 		_spec.Fields.Set = append(_spec.Fields.Set, &sqlgraph.FieldSpec{
 			Type:   field.TypeTime,
@@ -491,6 +512,20 @@ func (duo *DirectoryUpdateOne) SetName(s string) *DirectoryUpdateOne {
 // SetPath sets the "path" field.
 func (duo *DirectoryUpdateOne) SetPath(s string) *DirectoryUpdateOne {
 	duo.mutation.SetPath(s)
+	return duo
+}
+
+// SetIsDeleted sets the "is_deleted" field.
+func (duo *DirectoryUpdateOne) SetIsDeleted(b bool) *DirectoryUpdateOne {
+	duo.mutation.SetIsDeleted(b)
+	return duo
+}
+
+// SetNillableIsDeleted sets the "is_deleted" field if the given value is not nil.
+func (duo *DirectoryUpdateOne) SetNillableIsDeleted(b *bool) *DirectoryUpdateOne {
+	if b != nil {
+		duo.SetIsDeleted(*b)
+	}
 	return duo
 }
 
@@ -752,6 +787,13 @@ func (duo *DirectoryUpdateOne) sqlSave(ctx context.Context) (_node *Directory, e
 			Type:   field.TypeString,
 			Value:  value,
 			Column: directory.FieldPath,
+		})
+	}
+	if value, ok := duo.mutation.IsDeleted(); ok {
+		_spec.Fields.Set = append(_spec.Fields.Set, &sqlgraph.FieldSpec{
+			Type:   field.TypeBool,
+			Value:  value,
+			Column: directory.FieldIsDeleted,
 		})
 	}
 	if value, ok := duo.mutation.UpdatedAt(); ok {

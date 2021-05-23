@@ -21,6 +21,8 @@ type Directory struct {
 	Name string `json:"name,omitempty"`
 	// Path holds the value of the "path" field.
 	Path string `json:"path,omitempty"`
+	// IsDeleted holds the value of the "is_deleted" field.
+	IsDeleted bool `json:"is_deleted,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -98,6 +100,8 @@ func (*Directory) scanValues(columns []string) ([]interface{}, error) {
 	values := make([]interface{}, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case directory.FieldIsDeleted:
+			values[i] = new(sql.NullBool)
 		case directory.FieldID, directory.FieldName, directory.FieldPath:
 			values[i] = new(sql.NullString)
 		case directory.FieldCreatedAt, directory.FieldUpdatedAt:
@@ -138,6 +142,12 @@ func (d *Directory) assignValues(columns []string, values []interface{}) error {
 				return fmt.Errorf("unexpected type %T for field path", values[i])
 			} else if value.Valid {
 				d.Path = value.String
+			}
+		case directory.FieldIsDeleted:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field is_deleted", values[i])
+			} else if value.Valid {
+				d.IsDeleted = value.Bool
 			}
 		case directory.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -217,6 +227,8 @@ func (d *Directory) String() string {
 	builder.WriteString(d.Name)
 	builder.WriteString(", path=")
 	builder.WriteString(d.Path)
+	builder.WriteString(", is_deleted=")
+	builder.WriteString(fmt.Sprintf("%v", d.IsDeleted))
 	builder.WriteString(", created_at=")
 	builder.WriteString(d.CreatedAt.Format(time.ANSIC))
 	builder.WriteString(", updated_at=")

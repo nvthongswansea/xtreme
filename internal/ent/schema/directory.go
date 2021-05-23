@@ -20,6 +20,7 @@ func (Directory) Fields() []ent.Field {
 		field.String("id").NotEmpty().Unique().Immutable(),
 		field.String("name").NotEmpty(),
 		field.String("path"),
+		field.Bool("is_deleted").Default(false),
 		field.Time("created_at").Immutable().Default(func() time.Time {
 			return time.Now()
 		}),

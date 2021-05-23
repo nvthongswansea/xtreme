@@ -13,6 +13,7 @@ var (
 		{Name: "id", Type: field.TypeString, Unique: true},
 		{Name: "name", Type: field.TypeString},
 		{Name: "path", Type: field.TypeString},
+		{Name: "is_deleted", Type: field.TypeBool, Default: false},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "directory_child_dirs", Type: field.TypeString, Nullable: true},
@@ -26,13 +27,13 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "directories_directories_childDirs",
-				Columns:    []*schema.Column{DirectoriesColumns[5]},
+				Columns:    []*schema.Column{DirectoriesColumns[6]},
 				RefColumns: []*schema.Column{DirectoriesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "directories_users_directories",
-				Columns:    []*schema.Column{DirectoriesColumns[6]},
+				Columns:    []*schema.Column{DirectoriesColumns[7]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.Cascade,
 			},
@@ -41,7 +42,7 @@ var (
 			{
 				Name:    "directory_name_directory_child_dirs",
 				Unique:  true,
-				Columns: []*schema.Column{DirectoriesColumns[1], DirectoriesColumns[5]},
+				Columns: []*schema.Column{DirectoriesColumns[1], DirectoriesColumns[6]},
 			},
 		},
 	}
@@ -52,7 +53,8 @@ var (
 		{Name: "mime_type", Type: field.TypeString, Default: "unknown"},
 		{Name: "path", Type: field.TypeString},
 		{Name: "rel_path_on_disk", Type: field.TypeString, Unique: true},
-		{Name: "size", Type: field.TypeInt},
+		{Name: "size", Type: field.TypeInt64},
+		{Name: "is_deleted", Type: field.TypeBool, Default: false},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "directory_child_files", Type: field.TypeString, Nullable: true},
@@ -66,13 +68,13 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "files_directories_childFiles",
-				Columns:    []*schema.Column{FilesColumns[8]},
+				Columns:    []*schema.Column{FilesColumns[9]},
 				RefColumns: []*schema.Column{DirectoriesColumns[0]},
 				OnDelete:   schema.Cascade,
 			},
 			{
 				Symbol:     "files_users_files",
-				Columns:    []*schema.Column{FilesColumns[9]},
+				Columns:    []*schema.Column{FilesColumns[10]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.Cascade,
 			},
@@ -81,7 +83,7 @@ var (
 			{
 				Name:    "file_name_directory_child_files",
 				Unique:  true,
-				Columns: []*schema.Column{FilesColumns[1], FilesColumns[8]},
+				Columns: []*schema.Column{FilesColumns[1], FilesColumns[9]},
 			},
 		},
 	}

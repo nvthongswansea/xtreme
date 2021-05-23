@@ -56,16 +56,36 @@ func (fu *FileUpdate) SetPath(s string) *FileUpdate {
 	return fu
 }
 
+// SetRelPathOnDisk sets the "rel_path_on_disk" field.
+func (fu *FileUpdate) SetRelPathOnDisk(s string) *FileUpdate {
+	fu.mutation.SetRelPathOnDisk(s)
+	return fu
+}
+
 // SetSize sets the "size" field.
-func (fu *FileUpdate) SetSize(i int) *FileUpdate {
+func (fu *FileUpdate) SetSize(i int64) *FileUpdate {
 	fu.mutation.ResetSize()
 	fu.mutation.SetSize(i)
 	return fu
 }
 
 // AddSize adds i to the "size" field.
-func (fu *FileUpdate) AddSize(i int) *FileUpdate {
+func (fu *FileUpdate) AddSize(i int64) *FileUpdate {
 	fu.mutation.AddSize(i)
+	return fu
+}
+
+// SetIsDeleted sets the "is_deleted" field.
+func (fu *FileUpdate) SetIsDeleted(b bool) *FileUpdate {
+	fu.mutation.SetIsDeleted(b)
+	return fu
+}
+
+// SetNillableIsDeleted sets the "is_deleted" field if the given value is not nil.
+func (fu *FileUpdate) SetNillableIsDeleted(b *bool) *FileUpdate {
+	if b != nil {
+		fu.SetIsDeleted(*b)
+	}
 	return fu
 }
 
@@ -187,6 +207,11 @@ func (fu *FileUpdate) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf("ent: validator failed for field \"name\": %w", err)}
 		}
 	}
+	if v, ok := fu.mutation.RelPathOnDisk(); ok {
+		if err := file.RelPathOnDiskValidator(v); err != nil {
+			return &ValidationError{Name: "rel_path_on_disk", err: fmt.Errorf("ent: validator failed for field \"rel_path_on_disk\": %w", err)}
+		}
+	}
 	if v, ok := fu.mutation.Size(); ok {
 		if err := file.SizeValidator(v); err != nil {
 			return &ValidationError{Name: "size", err: fmt.Errorf("ent: validator failed for field \"size\": %w", err)}
@@ -240,18 +265,32 @@ func (fu *FileUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			Column: file.FieldPath,
 		})
 	}
+	if value, ok := fu.mutation.RelPathOnDisk(); ok {
+		_spec.Fields.Set = append(_spec.Fields.Set, &sqlgraph.FieldSpec{
+			Type:   field.TypeString,
+			Value:  value,
+			Column: file.FieldRelPathOnDisk,
+		})
+	}
 	if value, ok := fu.mutation.Size(); ok {
 		_spec.Fields.Set = append(_spec.Fields.Set, &sqlgraph.FieldSpec{
-			Type:   field.TypeInt,
+			Type:   field.TypeInt64,
 			Value:  value,
 			Column: file.FieldSize,
 		})
 	}
 	if value, ok := fu.mutation.AddedSize(); ok {
 		_spec.Fields.Add = append(_spec.Fields.Add, &sqlgraph.FieldSpec{
-			Type:   field.TypeInt,
+			Type:   field.TypeInt64,
 			Value:  value,
 			Column: file.FieldSize,
+		})
+	}
+	if value, ok := fu.mutation.IsDeleted(); ok {
+		_spec.Fields.Set = append(_spec.Fields.Set, &sqlgraph.FieldSpec{
+			Type:   field.TypeBool,
+			Value:  value,
+			Column: file.FieldIsDeleted,
 		})
 	}
 	if value, ok := fu.mutation.UpdatedAt(); ok {
@@ -376,16 +415,36 @@ func (fuo *FileUpdateOne) SetPath(s string) *FileUpdateOne {
 	return fuo
 }
 
+// SetRelPathOnDisk sets the "rel_path_on_disk" field.
+func (fuo *FileUpdateOne) SetRelPathOnDisk(s string) *FileUpdateOne {
+	fuo.mutation.SetRelPathOnDisk(s)
+	return fuo
+}
+
 // SetSize sets the "size" field.
-func (fuo *FileUpdateOne) SetSize(i int) *FileUpdateOne {
+func (fuo *FileUpdateOne) SetSize(i int64) *FileUpdateOne {
 	fuo.mutation.ResetSize()
 	fuo.mutation.SetSize(i)
 	return fuo
 }
 
 // AddSize adds i to the "size" field.
-func (fuo *FileUpdateOne) AddSize(i int) *FileUpdateOne {
+func (fuo *FileUpdateOne) AddSize(i int64) *FileUpdateOne {
 	fuo.mutation.AddSize(i)
+	return fuo
+}
+
+// SetIsDeleted sets the "is_deleted" field.
+func (fuo *FileUpdateOne) SetIsDeleted(b bool) *FileUpdateOne {
+	fuo.mutation.SetIsDeleted(b)
+	return fuo
+}
+
+// SetNillableIsDeleted sets the "is_deleted" field if the given value is not nil.
+func (fuo *FileUpdateOne) SetNillableIsDeleted(b *bool) *FileUpdateOne {
+	if b != nil {
+		fuo.SetIsDeleted(*b)
+	}
 	return fuo
 }
 
@@ -514,6 +573,11 @@ func (fuo *FileUpdateOne) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf("ent: validator failed for field \"name\": %w", err)}
 		}
 	}
+	if v, ok := fuo.mutation.RelPathOnDisk(); ok {
+		if err := file.RelPathOnDiskValidator(v); err != nil {
+			return &ValidationError{Name: "rel_path_on_disk", err: fmt.Errorf("ent: validator failed for field \"rel_path_on_disk\": %w", err)}
+		}
+	}
 	if v, ok := fuo.mutation.Size(); ok {
 		if err := file.SizeValidator(v); err != nil {
 			return &ValidationError{Name: "size", err: fmt.Errorf("ent: validator failed for field \"size\": %w", err)}
@@ -584,18 +648,32 @@ func (fuo *FileUpdateOne) sqlSave(ctx context.Context) (_node *File, err error) 
 			Column: file.FieldPath,
 		})
 	}
+	if value, ok := fuo.mutation.RelPathOnDisk(); ok {
+		_spec.Fields.Set = append(_spec.Fields.Set, &sqlgraph.FieldSpec{
+			Type:   field.TypeString,
+			Value:  value,
+			Column: file.FieldRelPathOnDisk,
+		})
+	}
 	if value, ok := fuo.mutation.Size(); ok {
 		_spec.Fields.Set = append(_spec.Fields.Set, &sqlgraph.FieldSpec{
-			Type:   field.TypeInt,
+			Type:   field.TypeInt64,
 			Value:  value,
 			Column: file.FieldSize,
 		})
 	}
 	if value, ok := fuo.mutation.AddedSize(); ok {
 		_spec.Fields.Add = append(_spec.Fields.Add, &sqlgraph.FieldSpec{
-			Type:   field.TypeInt,
+			Type:   field.TypeInt64,
 			Value:  value,
 			Column: file.FieldSize,
+		})
+	}
+	if value, ok := fuo.mutation.IsDeleted(); ok {
+		_spec.Fields.Set = append(_spec.Fields.Set, &sqlgraph.FieldSpec{
+			Type:   field.TypeBool,
+			Value:  value,
+			Column: file.FieldIsDeleted,
 		})
 	}
 	if value, ok := fuo.mutation.UpdatedAt(); ok {

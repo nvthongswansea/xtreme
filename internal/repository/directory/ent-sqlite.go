@@ -237,7 +237,24 @@ func (e EntSQLDirectoryRepo) GetDirUUIDByPath(ctx context.Context, tx transactio
 }
 
 func (e EntSQLDirectoryRepo) GetDirectChildDirUUIDList(ctx context.Context, tx transaction.RollbackCommitter, dirUUID string) ([]string, error) {
-	panic("implement me")
+	client := e.client
+	if tx != nil {
+		client = tx.(*ent.Tx).Client()
+	}
+	chilDirs, err := client.Directory.
+		Query().
+		Where(directory.ID(dirUUID)).
+		QueryChildDirs().
+		Select(directory.FieldID).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var uuidList []string
+	for _, child := range chilDirs {
+		uuidList = append(uuidList, child.ID)
+	}
+	return uuidList, nil
 }
 
 func (e EntSQLDirectoryRepo) IsDirNameExist(ctx context.Context, tx transaction.RollbackCommitter, parentDirUUID, name string) (bool, error) {
@@ -263,17 +280,56 @@ func (e EntSQLDirectoryRepo) IsDirNameExist(ctx context.Context, tx transaction.
 }
 
 func (e EntSQLDirectoryRepo) UpdateDirname(ctx context.Context, tx transaction.RollbackCommitter, newDirname, dirUUID string) error {
-	panic("implement me")
+	client := e.client
+	if tx != nil {
+		client = tx.(*ent.Tx).Client()
+	}
+	err := client.Directory.UpdateOneID(dirUUID).
+		SetName(newDirname).
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (e EntSQLDirectoryRepo) UpdateParentDirUUID(ctx context.Context, tx transaction.RollbackCommitter, newParentDirUUID, dirUUID string) error {
-	panic("implement me")
+	client := e.client
+	if tx != nil {
+		client = tx.(*ent.Tx).Client()
+	}
+	err := client.Directory.UpdateOneID(dirUUID).
+		SetParentID(newParentDirUUID).
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (e EntSQLDirectoryRepo) SoftRemoveDir(ctx context.Context, tx transaction.RollbackCommitter, dirUUID string) error {
-	panic("implement me")
+	client := e.client
+	if tx != nil {
+		client = tx.(*ent.Tx).Client()
+	}
+	err := client.Directory.UpdateOneID(dirUUID).
+		SetIsDeleted(true).
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (e EntSQLDirectoryRepo) HardRemoveDir(ctx context.Context, tx transaction.RollbackCommitter, dirUUID string) error {
-	panic("implement me")
+	client := e.client
+	if tx != nil {
+		client = tx.(*ent.Tx).Client()
+	}
+	err := client.Directory.DeleteOneID(dirUUID).
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+	return nil
 }

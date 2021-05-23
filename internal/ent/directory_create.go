@@ -34,6 +34,20 @@ func (dc *DirectoryCreate) SetPath(s string) *DirectoryCreate {
 	return dc
 }
 
+// SetIsDeleted sets the "is_deleted" field.
+func (dc *DirectoryCreate) SetIsDeleted(b bool) *DirectoryCreate {
+	dc.mutation.SetIsDeleted(b)
+	return dc
+}
+
+// SetNillableIsDeleted sets the "is_deleted" field if the given value is not nil.
+func (dc *DirectoryCreate) SetNillableIsDeleted(b *bool) *DirectoryCreate {
+	if b != nil {
+		dc.SetIsDeleted(*b)
+	}
+	return dc
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (dc *DirectoryCreate) SetCreatedAt(t time.Time) *DirectoryCreate {
 	dc.mutation.SetCreatedAt(t)
@@ -180,6 +194,10 @@ func (dc *DirectoryCreate) SaveX(ctx context.Context) *Directory {
 
 // defaults sets the default values of the builder before save.
 func (dc *DirectoryCreate) defaults() {
+	if _, ok := dc.mutation.IsDeleted(); !ok {
+		v := directory.DefaultIsDeleted
+		dc.mutation.SetIsDeleted(v)
+	}
 	if _, ok := dc.mutation.CreatedAt(); !ok {
 		v := directory.DefaultCreatedAt()
 		dc.mutation.SetCreatedAt(v)
@@ -202,6 +220,9 @@ func (dc *DirectoryCreate) check() error {
 	}
 	if _, ok := dc.mutation.Path(); !ok {
 		return &ValidationError{Name: "path", err: errors.New("ent: missing required field \"path\"")}
+	}
+	if _, ok := dc.mutation.IsDeleted(); !ok {
+		return &ValidationError{Name: "is_deleted", err: errors.New("ent: missing required field \"is_deleted\"")}
 	}
 	if _, ok := dc.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New("ent: missing required field \"created_at\"")}
@@ -261,6 +282,14 @@ func (dc *DirectoryCreate) createSpec() (*Directory, *sqlgraph.CreateSpec) {
 			Column: directory.FieldPath,
 		})
 		_node.Path = value
+	}
+	if value, ok := dc.mutation.IsDeleted(); ok {
+		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
+			Type:   field.TypeBool,
+			Value:  value,
+			Column: directory.FieldIsDeleted,
+		})
+		_node.IsDeleted = value
 	}
 	if value, ok := dc.mutation.CreatedAt(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{

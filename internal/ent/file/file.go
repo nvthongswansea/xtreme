@@ -21,6 +21,8 @@ const (
 	FieldRelPathOnDisk = "rel_path_on_disk"
 	// FieldSize holds the string denoting the size field in the database.
 	FieldSize = "size"
+	// FieldIsDeleted holds the string denoting the is_deleted field in the database.
+	FieldIsDeleted = "is_deleted"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -55,6 +57,7 @@ var Columns = []string{
 	FieldPath,
 	FieldRelPathOnDisk,
 	FieldSize,
+	FieldIsDeleted,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -89,7 +92,9 @@ var (
 	// RelPathOnDiskValidator is a validator for the "rel_path_on_disk" field. It is called by the builders before save.
 	RelPathOnDiskValidator func(string) error
 	// SizeValidator is a validator for the "size" field. It is called by the builders before save.
-	SizeValidator func(int) error
+	SizeValidator func(int64) error
+	// DefaultIsDeleted holds the default value on creation for the "is_deleted" field.
+	DefaultIsDeleted bool
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.

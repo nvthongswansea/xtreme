@@ -27,7 +27,9 @@ type File struct {
 	// RelPathOnDisk holds the value of the "rel_path_on_disk" field.
 	RelPathOnDisk string `json:"rel_path_on_disk,omitempty"`
 	// Size holds the value of the "size" field.
-	Size int `json:"size,omitempty"`
+	Size int64 `json:"size,omitempty"`
+	// IsDeleted holds the value of the "is_deleted" field.
+	IsDeleted bool `json:"is_deleted,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -83,6 +85,8 @@ func (*File) scanValues(columns []string) ([]interface{}, error) {
 	values := make([]interface{}, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case file.FieldIsDeleted:
+			values[i] = new(sql.NullBool)
 		case file.FieldSize:
 			values[i] = new(sql.NullInt64)
 		case file.FieldID, file.FieldName, file.FieldMimeType, file.FieldPath, file.FieldRelPathOnDisk:
@@ -142,7 +146,13 @@ func (f *File) assignValues(columns []string, values []interface{}) error {
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field size", values[i])
 			} else if value.Valid {
-				f.Size = int(value.Int64)
+				f.Size = value.Int64
+			}
+		case file.FieldIsDeleted:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field is_deleted", values[i])
+			} else if value.Valid {
+				f.IsDeleted = value.Bool
 			}
 		case file.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -218,6 +228,8 @@ func (f *File) String() string {
 	builder.WriteString(f.RelPathOnDisk)
 	builder.WriteString(", size=")
 	builder.WriteString(fmt.Sprintf("%v", f.Size))
+	builder.WriteString(", is_deleted=")
+	builder.WriteString(fmt.Sprintf("%v", f.IsDeleted))
 	builder.WriteString(", created_at=")
 	builder.WriteString(f.CreatedAt.Format(time.ANSIC))
 	builder.WriteString(", updated_at=")

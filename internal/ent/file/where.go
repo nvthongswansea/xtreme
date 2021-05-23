@@ -122,9 +122,16 @@ func RelPathOnDisk(v string) predicate.File {
 }
 
 // Size applies equality check predicate on the "size" field. It's identical to SizeEQ.
-func Size(v int) predicate.File {
+func Size(v int64) predicate.File {
 	return predicate.File(func(s *sql.Selector) {
 		s.Where(sql.EQ(s.C(FieldSize), v))
+	})
+}
+
+// IsDeleted applies equality check predicate on the "is_deleted" field. It's identical to IsDeletedEQ.
+func IsDeleted(v bool) predicate.File {
+	return predicate.File(func(s *sql.Selector) {
+		s.Where(sql.EQ(s.C(FieldIsDeleted), v))
 	})
 }
 
@@ -587,21 +594,21 @@ func RelPathOnDiskContainsFold(v string) predicate.File {
 }
 
 // SizeEQ applies the EQ predicate on the "size" field.
-func SizeEQ(v int) predicate.File {
+func SizeEQ(v int64) predicate.File {
 	return predicate.File(func(s *sql.Selector) {
 		s.Where(sql.EQ(s.C(FieldSize), v))
 	})
 }
 
 // SizeNEQ applies the NEQ predicate on the "size" field.
-func SizeNEQ(v int) predicate.File {
+func SizeNEQ(v int64) predicate.File {
 	return predicate.File(func(s *sql.Selector) {
 		s.Where(sql.NEQ(s.C(FieldSize), v))
 	})
 }
 
 // SizeIn applies the In predicate on the "size" field.
-func SizeIn(vs ...int) predicate.File {
+func SizeIn(vs ...int64) predicate.File {
 	v := make([]interface{}, len(vs))
 	for i := range v {
 		v[i] = vs[i]
@@ -618,7 +625,7 @@ func SizeIn(vs ...int) predicate.File {
 }
 
 // SizeNotIn applies the NotIn predicate on the "size" field.
-func SizeNotIn(vs ...int) predicate.File {
+func SizeNotIn(vs ...int64) predicate.File {
 	v := make([]interface{}, len(vs))
 	for i := range v {
 		v[i] = vs[i]
@@ -635,30 +642,44 @@ func SizeNotIn(vs ...int) predicate.File {
 }
 
 // SizeGT applies the GT predicate on the "size" field.
-func SizeGT(v int) predicate.File {
+func SizeGT(v int64) predicate.File {
 	return predicate.File(func(s *sql.Selector) {
 		s.Where(sql.GT(s.C(FieldSize), v))
 	})
 }
 
 // SizeGTE applies the GTE predicate on the "size" field.
-func SizeGTE(v int) predicate.File {
+func SizeGTE(v int64) predicate.File {
 	return predicate.File(func(s *sql.Selector) {
 		s.Where(sql.GTE(s.C(FieldSize), v))
 	})
 }
 
 // SizeLT applies the LT predicate on the "size" field.
-func SizeLT(v int) predicate.File {
+func SizeLT(v int64) predicate.File {
 	return predicate.File(func(s *sql.Selector) {
 		s.Where(sql.LT(s.C(FieldSize), v))
 	})
 }
 
 // SizeLTE applies the LTE predicate on the "size" field.
-func SizeLTE(v int) predicate.File {
+func SizeLTE(v int64) predicate.File {
 	return predicate.File(func(s *sql.Selector) {
 		s.Where(sql.LTE(s.C(FieldSize), v))
+	})
+}
+
+// IsDeletedEQ applies the EQ predicate on the "is_deleted" field.
+func IsDeletedEQ(v bool) predicate.File {
+	return predicate.File(func(s *sql.Selector) {
+		s.Where(sql.EQ(s.C(FieldIsDeleted), v))
+	})
+}
+
+// IsDeletedNEQ applies the NEQ predicate on the "is_deleted" field.
+func IsDeletedNEQ(v bool) predicate.File {
+	return predicate.File(func(s *sql.Selector) {
+		s.Where(sql.NEQ(s.C(FieldIsDeleted), v))
 	})
 }
 

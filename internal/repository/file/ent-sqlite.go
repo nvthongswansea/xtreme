@@ -41,23 +41,143 @@ func (e EntSQLFileRepo) InsertFile(ctx context.Context, tx transaction.RollbackC
 }
 
 func (e EntSQLFileRepo) GetFile(ctx context.Context, tx transaction.RollbackCommitter, fileUUID string) (models.File, error) {
-	panic("implement me")
+	client := e.client
+	if tx != nil {
+		client = tx.(*ent.Tx).Client()
+	}
+	f, err := client.File.
+		Query().
+		Where(file.ID(fileUUID)).
+		WithOwner().
+		WithParent().
+		First(ctx)
+	if err != nil {
+		return models.File{}, err
+	}
+	return models.File{
+		Metadata:    models.FileMetadata{
+			UUID:          f.ID,
+			Filename:      f.Name,
+			MIMEType:      f.MimeType,
+			Path:          f.Path,
+			RelPathOnDisk: f.RelPathOnDisk,
+			ParentUUID:    f.Edges.Parent.ID,
+			Size:          f.Size,
+			OwnerUUID:     f.Edges.Owner.ID,
+			CreatedAt:     f.CreatedAt,
+			UpdatedAt:     f.UpdatedAt,
+		},
+	}, nil
 }
 
 func (e EntSQLFileRepo) GetFileMetadata(ctx context.Context, tx transaction.RollbackCommitter, fileUUID string) (models.FileMetadata, error) {
-	panic("implement me")
+	client := e.client
+	if tx != nil {
+		client = tx.(*ent.Tx).Client()
+	}
+	f, err := client.File.
+		Query().
+		Where(file.ID(fileUUID)).
+		First(ctx)
+	if err != nil {
+		return models.FileMetadata{}, err
+	}
+	return models.FileMetadata{
+			UUID:          f.ID,
+			Filename:      f.Name,
+			MIMEType:      f.MimeType,
+			Path:          f.Path,
+			RelPathOnDisk: f.RelPathOnDisk,
+			Size:          f.Size,
+			CreatedAt:     f.CreatedAt,
+			UpdatedAt:     f.UpdatedAt,
+		}, nil
 }
 
 func (e EntSQLFileRepo) GetFileMetadataBatch(ctx context.Context, tx transaction.RollbackCommitter, fileUUIDs []string) ([]models.FileMetadata, error) {
-	panic("implement me")
+	client := e.client
+	if tx != nil {
+		client = tx.(*ent.Tx).Client()
+	}
+	fileList, err := client.File.
+		Query().
+		Where(file.IDIn(fileUUIDs...)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var fileMetadataList []models.FileMetadata
+	for _, f := range fileList {
+		fileMetadataList = append(fileMetadataList, models.FileMetadata{
+			UUID:          f.ID,
+			Filename:      f.Name,
+			MIMEType:      f.MimeType,
+			Path:          f.Path,
+			RelPathOnDisk: f.RelPathOnDisk,
+			Size:          f.Size,
+			CreatedAt:     f.CreatedAt,
+			UpdatedAt:     f.UpdatedAt,
+		})
+	}
+	return fileMetadataList, nil
 }
 
 func (e EntSQLFileRepo) GetFileMetadataListByDir(ctx context.Context, tx transaction.RollbackCommitter, dirUUID string) ([]models.FileMetadata, error) {
-	panic("implement me")
+	client := e.client
+	if tx != nil {
+		client = tx.(*ent.Tx).Client()
+	}
+	fileList, err := client.File.
+		Query().
+		Where(file.HasParentWith(directory.ID(dirUUID))).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var fileMetadataList []models.FileMetadata
+	for _, f := range fileList {
+		fileMetadataList = append(fileMetadataList, models.FileMetadata{
+			UUID:          f.ID,
+			Filename:      f.Name,
+			MIMEType:      f.MimeType,
+			Path:          f.Path,
+			RelPathOnDisk: f.RelPathOnDisk,
+			Size:          f.Size,
+			CreatedAt:     f.CreatedAt,
+			UpdatedAt:     f.UpdatedAt,
+		})
+	}
+	return fileMetadataList, nil
 }
 
 func (e EntSQLFileRepo) GetFileMetadataListByName(ctx context.Context, tx transaction.RollbackCommitter, parentDirUUID, filename string) ([]models.FileMetadata, error) {
-	panic("implement me")
+	client := e.client
+	if tx != nil {
+		client = tx.(*ent.Tx).Client()
+	}
+	fileList, err := client.File.Query().
+		Where(file.And(
+			file.HasParentWith(directory.ID(parentDirUUID)),
+			file.NameContains(filename),
+		)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var fileMetadataList []models.FileMetadata
+	for _, f := range fileList {
+		fileMetadataList = append(fileMetadataList, models.FileMetadata{
+			UUID:          f.ID,
+			Filename:      f.Name,
+			MIMEType:      f.MimeType,
+			Path:          f.Path,
+			RelPathOnDisk: f.RelPathOnDisk,
+			Size:          f.Size,
+			CreatedAt:     f.CreatedAt,
+			UpdatedAt:     f.UpdatedAt,
+		})
+	}
+	return fileMetadataList, nil
 }
 
 func (e EntSQLFileRepo) IsFilenameExist(ctx context.Context, tx transaction.RollbackCommitter, parentDirUUID, name string) (bool, error) {
@@ -83,17 +203,84 @@ func (e EntSQLFileRepo) IsFilenameExist(ctx context.Context, tx transaction.Roll
 }
 
 func (e EntSQLFileRepo) UpdateFilename(ctx context.Context, tx transaction.RollbackCommitter, newFilename, fileUUID string) error {
-	panic("implement me")
+	client := e.client
+	if tx != nil {
+		client = tx.(*ent.Tx).Client()
+	}
+	err := client.File.UpdateOneID(fileUUID).
+		SetName(newFilename).
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (e EntSQLFileRepo) UpdateFileRelPathOD(ctx context.Context, tx transaction.RollbackCommitter, relPathOD, fileUUID string) error {
+	client := e.client
+	if tx != nil {
+		client = tx.(*ent.Tx).Client()
+	}
+	err := client.File.UpdateOneID(fileUUID).
+		SetRelPathOnDisk(relPathOD).
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (e EntSQLFileRepo) UpdateFileSize(ctx context.Context, tx transaction.RollbackCommitter, size int64, fileUUID string) error {
+	client := e.client
+	if tx != nil {
+		client = tx.(*ent.Tx).Client()
+	}
+	err := client.File.UpdateOneID(fileUUID).
+		SetSize(size).
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (e EntSQLFileRepo) UpdateParentDirUUID(ctx context.Context, tx transaction.RollbackCommitter, newParentDirUUID, fileUUID string) error {
-	panic("implement me")
+	client := e.client
+	if tx != nil {
+		client = tx.(*ent.Tx).Client()
+	}
+	err := client.File.UpdateOneID(fileUUID).
+		SetParentID(newParentDirUUID).
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (e EntSQLFileRepo) SoftRemoveFile(ctx context.Context, tx transaction.RollbackCommitter, fileUUID string) error {
-	panic("implement me")
+	client := e.client
+	if tx != nil {
+		client = tx.(*ent.Tx).Client()
+	}
+	err := client.File.UpdateOneID(fileUUID).
+		SetIsDeleted(true).
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (e EntSQLFileRepo) HardRemoveFile(ctx context.Context, tx transaction.RollbackCommitter, fileUUID string, rmFileFn func(string) error) error {
-	panic("implement me")
+	client := e.client
+	if tx != nil {
+		client = tx.(*ent.Tx).Client()
+	}
+	err := client.File.DeleteOneID(fileUUID).
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+	return nil
 }
