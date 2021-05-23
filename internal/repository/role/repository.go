@@ -5,6 +5,10 @@ import (
 	"github.com/nvthongswansea/xtreme/internal/repository/transaction"
 )
 
+const (
+	OwnerRol = "owner"
+)
+
 // Repository defines user role getter methods w.r.t specific
 // file/directory.
 type Repository interface {

@@ -8,6 +8,7 @@ import (
 	"github.com/nvthongswansea/xtreme/internal/file-manager/local"
 	"github.com/nvthongswansea/xtreme/internal/repository/directory"
 	"github.com/nvthongswansea/xtreme/internal/repository/file"
+	"github.com/nvthongswansea/xtreme/internal/repository/role"
 	"github.com/nvthongswansea/xtreme/internal/repository/transaction"
 	"github.com/nvthongswansea/xtreme/internal/repository/user"
 	"github.com/nvthongswansea/xtreme/pkg/fileUtils"
@@ -29,7 +30,11 @@ func InitHTTPHandler(e *echo.Echo, client *ent.Client, basePath string) {
 	authService := authen.NewLocalAuthenticator(userRepo, txRepo, dirRepo, passwordUtils, "test")
 	attachAuthenHTTPHandlerHandler(e, authService)
 
-
-	localFManService := local.NewMultiOSFileManager(fileRepo, dirRepo, txRepo, uuidUtils, fileOps, fileCompress, author.StubAuthorizer{})
+	roleRepo := role.NewEntSQLRoleRepo(client, uuidUtils)
+	authorRepo, err := author.NewCasbinAuthorizer("casbin-cfg/model.conf", "casbin-cfg/policy.csv", roleRepo)
+	if err != nil {
+		panic(err)
+	}
+	localFManService := local.NewMultiOSFileManager(fileRepo, dirRepo, txRepo, uuidUtils, fileOps, fileCompress, authorRepo)
 	attachLocalFManHTTPHandler(e, localFManService, authService)
 }
